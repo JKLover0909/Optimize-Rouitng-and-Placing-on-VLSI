@@ -12,10 +12,10 @@ from pathlib import Path
 import shutil
 
 # Configuration
-BASE_DIR = "/home/ubuntu/vnet/Thesis/DREAMPlace/install"
+BASE_DIR = "DREAMPlace/install"
 BENCHMARKS_DIR = f"{BASE_DIR}/benchmarks/ispd2005"
 RESULTS_DIR = f"{BASE_DIR}/results"
-SCRIPTS_DIR = "/home/ubuntu/vnet/Thesis"
+SCRIPTS_DIR = "."
 
 # Page configuration
 st.set_page_config(

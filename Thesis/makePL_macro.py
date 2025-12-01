@@ -172,7 +172,7 @@ def main():
     area_threshold = float(sys.argv[2]) if len(sys.argv) > 2 else 1000
     
     # File paths
-    base_dir = "/home/ubuntu/vnet/Thesis/DREAMPlace/install/benchmarks/ispd2005"
+    base_dir = "DREAMPlace/install/benchmarks/ispd2005"
     benchmark_dir = f"{base_dir}/{benchmark}"
     nodes_file = f"{benchmark_dir}/{benchmark}.nodes"
     nets_file = f"{benchmark_dir}/{benchmark}.nets"

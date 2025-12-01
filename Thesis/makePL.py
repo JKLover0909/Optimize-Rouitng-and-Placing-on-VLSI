@@ -236,7 +236,7 @@ def main():
     args = parser.parse_args()
     
     # Build benchmark path
-    base_dir = "/home/ubuntu/vnet/Thesis/DREAMPlace/install/benchmarks/ispd2005"
+    base_dir = "DREAMPlace/install/benchmarks/ispd2005"
     benchmark_path = Path(base_dir) / args.benchmark_name
     if not benchmark_path.exists():
         print(f"Error: Benchmark path does not exist: {benchmark_path}")
