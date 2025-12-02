@@ -10,6 +10,7 @@ import os
 import glob
 from pathlib import Path
 import shutil
+from PIL import Image
 
 # Configuration
 BASE_DIR = "DREAMPlace/install"
@@ -212,6 +213,17 @@ def run_dreamplace(benchmark, output_container=None):
         return False, "DREAMPlace execution timeout (>10 minutes)"
     except Exception as e:
         return False, str(e)
+
+def rotate_image_180(image_path):
+    """Flip image vertically (top-bottom)."""
+    try:
+        img = Image.open(image_path)
+        # Flip vertical only (top-bottom)
+        final_img = img.transpose(Image.FLIP_TOP_BOTTOM)
+        return final_img
+    except Exception as e:
+        st.error(f"Error rotating image: {e}")
+        return Image.open(image_path)
 
 def get_latest_plot_image(benchmark):
     """Find and return path to the latest iteration plot image."""
@@ -522,8 +534,9 @@ def show_step4_view_results():
     if latest_image:
         st.subheader("📊 Final Placement Visualization")
         
-        # Display image
-        st.image(latest_image, caption=f"Final placement: {os.path.basename(latest_image)}", use_container_width=True)
+        # Display image (rotated 180 degrees)
+        rotated_img = rotate_image_180(latest_image)
+        st.image(rotated_img, caption=f"Final placement: {os.path.basename(latest_image)}", use_container_width=True)
         
         # Show image path
         st.info(f"📁 Full path: `{latest_image}`")
@@ -547,7 +560,8 @@ def show_step4_view_results():
                         idx = i + j
                         if idx < len(png_files):
                             with col:
-                                st.image(png_files[idx], caption=os.path.basename(png_files[idx]), use_container_width=True)
+                                rotated_img = rotate_image_180(png_files[idx])
+                                st.image(rotated_img, caption=os.path.basename(png_files[idx]), use_container_width=True)
     else:
         st.warning("⚠️ No visualization found. The plot directory may be empty.")
         st.write(f"Expected location: `{RESULTS_DIR}/{st.session_state.selected_benchmark}/plot`")
