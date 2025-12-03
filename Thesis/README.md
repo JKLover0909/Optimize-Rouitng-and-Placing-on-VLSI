@@ -1,6 +1,6 @@
 docker run --gpus 1 -it -v $(pwd):/DREAMPlace limbo018/dreamplace:cuda bash
 
-python dreamplace/Placer.py test/ispd2005.adaptec1.json --plot_flag 1
+python dreamplace/Placer.py test/ispd2005/adaptec2.json 
 
 # lần đầu
 docker run --gpus all -it --name dreamplace_dev -v "$(pwd)":/DREAMPlace limbo018/dreamplace:cuda bash
