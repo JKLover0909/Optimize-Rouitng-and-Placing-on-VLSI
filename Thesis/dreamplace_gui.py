@@ -11,6 +11,9 @@ import glob
 from pathlib import Path
 import shutil
 from PIL import Image
+import re
+import matplotlib.pyplot as plt
+import pandas as pd
 
 # Configuration
 BASE_DIR = "DREAMPlace/install"
@@ -204,6 +207,16 @@ def run_dreamplace(benchmark, output_container=None):
         process.wait()
         full_output = ''.join(output_lines)
         
+        # Save log to file (ignore permission errors)
+        try:
+            log_file = f"{RESULTS_DIR}/{benchmark}/placement.log"
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            with open(log_file, 'w') as f:
+                f.write(full_output)
+        except (PermissionError, OSError) as e:
+            # Log exists but can't write - will try to read it anyway
+            pass
+        
         if process.returncode == 0:
             return True, full_output
         else:
@@ -224,6 +237,54 @@ def rotate_image_180(image_path):
     except Exception as e:
         st.error(f"Error rotating image: {e}")
         return Image.open(image_path)
+
+def parse_dreamplace_log(log_path):
+    """Parse DREAMPlace log file to extract metrics."""
+    if not os.path.exists(log_path):
+        return None
+    
+    iterations = []
+    hpwls = []
+    overflows = []
+    times = []
+    total_runtime = None
+    
+    try:
+        with open(log_path, 'r') as f:
+            for line in f:
+                # Parse iteration metrics
+                # Format: iteration 404, ( 404,  0,  0), Obj 4.291653E+07, DensityWeight 4.309693E-05, wHPWL 7.124266E+07, Overflow 5.932706E-01
+                match = re.search(r'iteration\s+(\d+),.*wHPWL\s+([0-9.E+\-]+).*Overflow\s+([0-9.E+\-]+)', line)
+                if match:
+                    iter_num = int(match.group(1))
+                    hpwl = float(match.group(2))
+                    overflow = float(match.group(3))
+                    iterations.append(iter_num)
+                    hpwls.append(hpwl)
+                    overflows.append(overflow * 100)  # Convert to percentage
+                
+                # Parse total runtime
+                # Format: DREAMPlace - placement takes 40.393 seconds
+                if 'placement takes' in line:
+                    runtime_match = re.search(r'placement takes\s+([0-9.]+)\s+seconds', line)
+                    if runtime_match:
+                        total_runtime = float(runtime_match.group(1))
+        
+        if not iterations:
+            return None
+        
+        return {
+            'iterations': iterations,
+            'hpwls': hpwls,
+            'overflows': overflows,
+            'final_hpwl': hpwls[-1] if hpwls else None,
+            'final_overflow': overflows[-1] if overflows else None,
+            'total_runtime': total_runtime,
+            'total_iterations': iterations[-1] if iterations else 0
+        }
+    except Exception as e:
+        st.error(f"Error parsing log: {e}")
+        return None
 
 def get_latest_plot_image(benchmark):
     """Find and return path to the latest iteration plot image."""
@@ -527,6 +588,63 @@ def show_step4_view_results():
     st.markdown('<div class="step-header">Step 4: Results & Visualization</div>', unsafe_allow_html=True)
     
     st.markdown(f'<div class="success-box">✅ Optimization completed for <strong>{st.session_state.selected_benchmark}</strong> with <strong>{st.session_state.selected_pagerank}</strong></div>', unsafe_allow_html=True)
+    
+    # Parse and display metrics
+    log_file = f"{RESULTS_DIR}/{st.session_state.selected_benchmark}/placement.log"
+    metrics = parse_dreamplace_log(log_file)
+    
+    if metrics:
+        st.markdown("---")
+        st.subheader("📊 Placement Metrics")
+        
+        # Metrics cards
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            hpwl_m = metrics['final_hpwl'] / 1e6
+            st.metric("Final HPWL", f"{hpwl_m:.2f}M")
+        
+        with col2:
+            st.metric("Final Overflow", f"{metrics['final_overflow']:.2f}%")
+        
+        with col3:
+            st.metric("Runtime", f"{metrics['total_runtime']:.2f}s" if metrics['total_runtime'] else "N/A")
+        
+        with col4:
+            st.metric("Iterations", f"{metrics['total_iterations']}")
+        
+        # HPWL Convergence Chart
+        st.markdown("---")
+        st.subheader("📈 HPWL Convergence")
+        
+        if len(metrics['iterations']) > 0:
+            fig, ax = plt.subplots(figsize=(12, 5))
+            
+            # Convert HPWL to millions for readability
+            hpwls_m = [h / 1e6 for h in metrics['hpwls']]
+            
+            ax.plot(metrics['iterations'], hpwls_m, linewidth=2, color='#1f77b4')
+            ax.set_xlabel('Iteration', fontsize=12)
+            ax.set_ylabel('HPWL (Millions)', fontsize=12)
+            ax.set_title('Half-Perimeter Wire Length Convergence', fontsize=14, fontweight='bold')
+            ax.grid(True, alpha=0.3)
+            
+            # Mark key milestones if available
+            if metrics['total_iterations'] > 600:  # Has legalization phase
+                ax.axvline(x=609, color='red', linestyle='--', alpha=0.7, label='Legalization')
+                ax.legend()
+            
+            st.pyplot(fig)
+            plt.close()
+            
+            # Show improvement percentage
+            if len(metrics['hpwls']) > 1:
+                initial_hpwl = metrics['hpwls'][0]
+                final_hpwl = metrics['hpwls'][-1]
+                improvement = ((initial_hpwl - final_hpwl) / initial_hpwl) * 100
+                st.info(f"💡 HPWL improved by {improvement:.2f}% (from {initial_hpwl/1e6:.2f}M to {final_hpwl/1e6:.2f}M)")
+    
+    st.markdown("---")
     
     # Get latest plot image
     latest_image = get_latest_plot_image(st.session_state.selected_benchmark)
