@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.collections import LineCollection
 import numpy as np
 from collections import defaultdict
 
@@ -85,7 +86,7 @@ def get_grid_bounds(nets):
 
 def visualize_routing_layer(nets, layer, output_png='routing_layer.png', show_net_names=False):
     """
-    Visualize routing on specific layer
+    Visualize routing on specific layer (optimized with LineCollection)
     """
     print(f"\n[Visualizing Layer {layer}]")
     
@@ -104,6 +105,14 @@ def visualize_routing_layer(nets, layer, output_png='routing_layer.png', show_ne
     segment_count = 0
     via_count = 0
     
+    # Collect all line segments for batch rendering
+    all_lines = []
+    all_colors = []
+    via_points = []
+    via_colors = []
+    
+    print(f"  Collecting segments...")
+    
     for net_name, net_data in nets.items():
         color = colors[color_idx % len(colors)]
         color_idx += 1
@@ -112,19 +121,33 @@ def visualize_routing_layer(nets, layer, output_png='routing_layer.png', show_ne
             # Draw horizontal/vertical segments on specified layer
             if z1 == layer and z2 == layer:
                 if x1 == x2 or y1 == y2:  # Straight line
-                    ax.plot([x1, x2], [y1, y2], 
-                           color=color, linewidth=1.5, alpha=0.7, 
-                           solid_capstyle='round')
+                    all_lines.append([(x1, y1), (x2, y2)])
+                    all_colors.append(color)
                     segment_count += 1
             
             # Draw vias (layer transitions)
             elif x1 == x2 and y1 == y2 and (z1 == layer or z2 == layer):
-                ax.scatter([x1], [y1], color=color, s=20, marker='o', 
-                          alpha=0.8, edgecolors='black', linewidths=0.5)
+                via_points.append([x1, y1])
+                via_colors.append(color)
                 via_count += 1
     
-    print(f"  Segments drawn: {segment_count}")
-    print(f"  Vias drawn: {via_count}")
+    print(f"  Rendering {segment_count} segments...")
+    
+    # Batch render all lines using LineCollection (MUCH faster!)
+    if all_lines:
+        lc = LineCollection(all_lines, colors=all_colors, linewidths=1.5, 
+                           alpha=0.7, capstyle='round')
+        ax.add_collection(lc)
+    
+    # Batch render vias
+    if via_points:
+        via_points = np.array(via_points)
+        ax.scatter(via_points[:, 0], via_points[:, 1], 
+                  c=via_colors, s=20, marker='o', 
+                  alpha=0.8, edgecolors='black', linewidths=0.5)
+    
+    print(f"  ✓ Segments drawn: {segment_count}")
+    print(f"  ✓ Vias drawn: {via_count}")
     
     # Set axis properties
     ax.set_xlim(min_x - 5, max_x + 5)
@@ -214,7 +237,7 @@ def create_congestion_heatmap(nets, grid_size=None, output_png='congestion_heatm
 
 def visualize_3d_overview(nets, output_png='routing_3d_overview.png'):
     """
-    Create multi-layer overview visualization
+    Create multi-layer overview visualization (optimized)
     """
     print(f"\n[Creating 3D Overview]")
     
@@ -230,8 +253,12 @@ def visualize_3d_overview(nets, output_png='routing_3d_overview.png'):
     colors = plt.cm.tab20(np.linspace(0, 1, min(20, len(nets))))
     
     for layer in range(num_layers):
+        print(f"  Processing layer {layer}...")
         ax = axes[layer]
         color_idx = 0
+        
+        all_lines = []
+        all_colors = []
         
         for net_name, net_data in nets.items():
             color = colors[color_idx % len(colors)]
@@ -239,8 +266,13 @@ def visualize_3d_overview(nets, output_png='routing_3d_overview.png'):
             
             for (x1, y1, z1), (x2, y2, z2) in net_data['segments']:
                 if z1 == layer and z2 == layer:
-                    ax.plot([x1, x2], [y1, y2], 
-                           color=color, linewidth=0.8, alpha=0.6)
+                    all_lines.append([(x1, y1), (x2, y2)])
+                    all_colors.append(color)
+        
+        # Batch render
+        if all_lines:
+            lc = LineCollection(all_lines, colors=all_colors, linewidths=0.8, alpha=0.6)
+            ax.add_collection(lc)
         
         ax.set_xlim(min_x - 5, max_x + 5)
         ax.set_ylim(min_y - 5, max_y + 5)
@@ -255,7 +287,7 @@ def visualize_3d_overview(nets, output_png='routing_3d_overview.png'):
     plt.savefig(output_png, dpi=150, bbox_inches='tight')
     plt.close()
     
-    print(f"  Saved to: {output_png}")
+    print(f"  ✓ Saved to: {output_png}")
 
 
 def print_statistics(nets):
@@ -391,7 +423,7 @@ Examples:
     if args.heatmap_only:
         # Only generate heatmap
         heatmap_file = output_dir / 'congestion_heatmap.png'
-        create_congestion_heatmap(nets, grid_size, heatmap_file)
+        create_congestion_heatmap(nets, grid_size, str(heatmap_file))
     else:
         # Determine which layers to visualize
         if args.layers:
@@ -406,15 +438,15 @@ Examples:
                 continue
             
             layer_file = output_dir / f'routing_layer{layer}.png'
-            visualize_routing_layer(nets, layer, layer_file)
+            visualize_routing_layer(nets, layer, str(layer_file))
         
         # Create congestion heatmap
         heatmap_file = output_dir / 'congestion_heatmap.png'
-        create_congestion_heatmap(nets, grid_size, heatmap_file)
+        create_congestion_heatmap(nets, grid_size, str(heatmap_file))
         
         # Create 3D overview
         overview_file = output_dir / 'routing_3d_overview.png'
-        visualize_3d_overview(nets, overview_file)
+        visualize_3d_overview(nets, str(overview_file))
     
     print("\n" + "="*60)
     print("✓ Visualization complete!")
