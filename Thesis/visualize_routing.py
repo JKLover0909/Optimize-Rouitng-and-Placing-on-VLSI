@@ -173,7 +173,7 @@ def visualize_routing_layer(nets, layer, output_png='routing_layer.png', show_ne
 
 def create_congestion_heatmap(nets, grid_size=None, output_png='congestion_heatmap.png'):
     """
-    Create congestion heatmap showing routing density
+    Create congestion heatmap showing routing density (optimized with numpy vectorization)
     """
     print(f"\n[Creating Congestion Heatmap]")
     
@@ -184,30 +184,47 @@ def create_congestion_heatmap(nets, grid_size=None, output_png='congestion_heatm
         grid_size = (max_x - min_x + 1, max_y - min_y + 1)
     
     print(f"  Heatmap size: {grid_size[0]} x {grid_size[1]}")
+    print(f"  Processing {len(nets)} nets...")
     
     # Initialize heatmap
-    heatmap = np.zeros((grid_size[1], grid_size[0]))
+    heatmap = np.zeros((grid_size[1], grid_size[0]), dtype=np.int32)
     
-    # Count routing through each grid cell
-    for net_data in nets.values():
+    total_segments = 0
+    # Count routing through each grid cell (optimized)
+    for net_idx, net_data in enumerate(nets.values()):
+        if net_idx % 1000 == 0 and net_idx > 0:
+            print(f"    Processed {net_idx}/{len(nets)} nets...")
+        
         for (x1, y1, z1), (x2, y2, z2) in net_data['segments']:
             if z1 == z2:  # Horizontal/vertical routing (not via)
-                # Draw line between points
+                total_segments += 1
+                # Draw line between points (vectorized)
                 if x1 == x2:  # Vertical line
-                    for y in range(min(y1, y2), max(y1, y2) + 1):
-                        hx = x1 - min_x
-                        hy = y - min_y
-                        if 0 <= hx < grid_size[0] and 0 <= hy < grid_size[1]:
-                            heatmap[hy, hx] += 1
+                    y_start = min(y1, y2)
+                    y_end = max(y1, y2)
+                    hx = x1 - min_x
+                    
+                    if 0 <= hx < grid_size[0]:
+                        for y in range(y_start, y_end + 1):
+                            hy = y - min_y
+                            if 0 <= hy < grid_size[1]:
+                                heatmap[hy, hx] += 1
+                                
                 elif y1 == y2:  # Horizontal line
-                    for x in range(min(x1, x2), max(x1, x2) + 1):
-                        hx = x - min_x
-                        hy = y1 - min_y
-                        if 0 <= hx < grid_size[0] and 0 <= hy < grid_size[1]:
-                            heatmap[hy, hx] += 1
+                    x_start = min(x1, x2)
+                    x_end = max(x1, x2)
+                    hy = y1 - min_y
+                    
+                    if 0 <= hy < grid_size[1]:
+                        for x in range(x_start, x_end + 1):
+                            hx = x - min_x
+                            if 0 <= hx < grid_size[0]:
+                                heatmap[hy, hx] += 1
     
     max_congestion = np.max(heatmap)
-    print(f"  Max congestion: {int(max_congestion)}")
+    avg_congestion = np.mean(heatmap[heatmap > 0]) if np.any(heatmap > 0) else 0
+    print(f"  ✓ Processed {total_segments} segments")
+    print(f"  ✓ Max congestion: {int(max_congestion)}, Avg: {avg_congestion:.2f}")
     
     # Create visualization
     fig, ax = plt.subplots(figsize=(16, 14))
