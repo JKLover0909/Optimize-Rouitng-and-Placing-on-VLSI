@@ -80,6 +80,10 @@ if 'selected_benchmark' not in st.session_state:
     st.session_state.selected_benchmark = None
 if 'selected_pagerank' not in st.session_state:
     st.session_state.selected_pagerank = None
+if 'component_type' not in st.session_state:
+    st.session_state.component_type = None  # "global", "macro", "stdcell"
+if 'placement_status' not in st.session_state:
+    st.session_state.placement_status = None  # "movable", "fixed"
 if 'pagerank_completed' not in st.session_state:
     st.session_state.pagerank_completed = False
 if 'dreamplace_completed' not in st.session_state:
@@ -124,9 +128,9 @@ def restore_original_pl(benchmark):
         return True
     return False
 
-def run_pagerank_script(benchmark, script_name, area_threshold=1000, output_container=None):
-    """Run PageRank script and return output."""
-    script_path = f"{SCRIPTS_DIR}/{script_name}"
+def run_pagerank_script(benchmark, component_type, placement_status, output_container=None):
+    """Run PageRank script using the combined script."""
+    script_path = f"{SCRIPTS_DIR}/makePL_combined.py"
     
     if not os.path.exists(script_path):
         return False, f"Script not found: {script_path}"
@@ -135,11 +139,10 @@ def run_pagerank_script(benchmark, script_name, area_threshold=1000, output_cont
         # Restore original .pl before running PageRank
         restore_original_pl(benchmark)
         
-        # Run the script
-        if script_name in ['makePL_macro.py', 'makePL_stdcell.py']:
-            cmd = ['python3', script_path, benchmark, str(area_threshold)]
-        else:
-            cmd = ['python3', script_path, benchmark]
+        # Build command with component_type and placement_status
+        # For global, placement_status should be "all"
+        status = "all" if component_type == "global" else placement_status
+        cmd = ['python3', script_path, benchmark, component_type, status]
         
         # Run with real-time output
         process = subprocess.Popen(
@@ -317,6 +320,8 @@ def reset_workflow():
     st.session_state.step = 1
     st.session_state.selected_benchmark = None
     st.session_state.selected_pagerank = None
+    st.session_state.component_type = None
+    st.session_state.placement_status = None
     st.session_state.pagerank_completed = False
     st.session_state.dreamplace_completed = False
 
@@ -336,9 +341,16 @@ def main():
             st.info("⏳ Step 1: Benchmark Selection")
         
         if st.session_state.step >= 2:
-            st.success("✅ Step 2: PageRank Optimization")
+            st.success("✅ Step 2: Component Type")
         else:
-            st.info("⏳ Step 2: PageRank Optimization")
+            st.info("⏳ Step 2: Component Type")
+        
+        # Show step 2.5 only if macro or stdcell is selected
+        if st.session_state.component_type in ["macro", "stdcell"]:
+            if st.session_state.step >= 2.5:
+                st.success("✅ Step 2.5: Placement Status")
+            else:
+                st.info("⏳ Step 2.5: Placement Status")
         
         if st.session_state.step >= 3:
             st.success("✅ Step 3: Run DREAMPlace")
@@ -356,8 +368,13 @@ def main():
         if st.session_state.selected_benchmark:
             st.write(f"**Benchmark:** {st.session_state.selected_benchmark}")
         
-        if st.session_state.selected_pagerank:
-            st.write(f"**PageRank:** {st.session_state.selected_pagerank}")
+        if st.session_state.component_type:
+            type_labels = {"global": "🌐 Global", "macro": "📦 Macro", "stdcell": "📱 Standard Cells"}
+            st.write(f"**Type:** {type_labels.get(st.session_state.component_type, st.session_state.component_type)}")
+        
+        if st.session_state.placement_status:
+            status_labels = {"movable": "🔄 Movable", "fixed": "📌 Fixed"}
+            st.write(f"**Status:** {status_labels.get(st.session_state.placement_status, st.session_state.placement_status)}")
         
         st.markdown("---")
         
@@ -370,7 +387,9 @@ def main():
     if st.session_state.step == 1:
         show_step1_benchmark_selection()
     elif st.session_state.step == 2:
-        show_step2_pagerank_optimization()
+        show_step2_component_type()
+    elif st.session_state.step == 2.5:
+        show_step2_5_placement_status()
     elif st.session_state.step == 3:
         show_step3_run_dreamplace()
     elif st.session_state.step == 4:
@@ -428,124 +447,200 @@ def show_step1_benchmark_selection():
                         break
         
         # Next button
-        if st.button("➡️ Next: PageRank Optimization", type="primary"):
+        if st.button("➡️ Next: Select Component Type", type="primary"):
             st.session_state.step = 2
             st.rerun()
 
-def show_step2_pagerank_optimization():
-    """Step 2: Apply PageRank optimization."""
-    st.markdown('<div class="step-header">Step 2: PageRank Optimization</div>', unsafe_allow_html=True)
+def show_step2_component_type():
+    """Step 2: Select component type for PageRank optimization."""
+    st.markdown('<div class="step-header">Step 2: Select Component Type</div>', unsafe_allow_html=True)
     
     st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
     
-    st.write("Select a PageRank optimization strategy to reorder the placement file:")
+    st.write("Select which type of components to optimize with PageRank:")
     
-    # PageRank options
-    pagerank_options = {
-        "Global (All Components)": {
-            "script": "makePL.py",
-            "description": "Sort all components by PageRank score",
-            "icon": "🌐"
+    st.markdown("""
+    <div class="info-box">
+    <strong>Component Classification (based on .scl row height):</strong><br>
+    • <strong>Standard Cells:</strong> Height ≤ row height (typically 1 row)<br>
+    • <strong>Macros:</strong> Height > row height (multi-row blocks)
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Component type options
+    component_options = {
+        "global": {
+            "name": "🌐 Global (All Components)",
+            "description": "Sort ALL components by PageRank score regardless of type"
         },
-        "Standard Cells Only": {
-            "script": "makePL_stdcell.py",
-            "description": "Sort only standard cells (area < 1000)",
-            "icon": "📱"
+        "macro": {
+            "name": "📦 Macro Blocks",
+            "description": "Sort only macro blocks (height > row height)"
         },
-        "Macros Only": {
-            "script": "makePL_macro.py",
-            "description": "Sort only macro blocks (area ≥ 1000)",
-            "icon": "📦"
-        },
-        "Fixed Components": {
-            "script": "makePL_fixed.py",
-            "description": "Sort only FIXED/terminal components",
-            "icon": "📌"
-        },
-        "Movable Components": {
-            "script": "makePL_movable.py",
-            "description": "Sort only movable components",
-            "icon": "🔄"
+        "stdcell": {
+            "name": "📱 Standard Cells",
+            "description": "Sort only standard cells (height ≤ row height)"
         }
     }
     
-    # Display options
-    for option_name, option_info in pagerank_options.items():
+    # Display options as cards
+    for comp_type, option_info in component_options.items():
         with st.container():
             col1, col2 = st.columns([3, 1])
             
             with col1:
-                st.write(f"{option_info['icon']} **{option_name}**")
+                st.write(f"**{option_info['name']}**")
                 st.caption(option_info['description'])
             
             with col2:
                 if st.button(
                     "Select",
-                    key=f"pr_{option_name}",
+                    key=f"comp_{comp_type}",
                     use_container_width=True,
-                    type="primary" if st.session_state.selected_pagerank == option_name else "secondary"
+                    type="primary" if st.session_state.component_type == comp_type else "secondary"
                 ):
-                    st.session_state.selected_pagerank = option_name
+                    st.session_state.component_type = comp_type
+                    # If global is selected, clear placement_status
+                    if comp_type == "global":
+                        st.session_state.placement_status = None
     
-    # Area threshold for macro/stdcell options
-    if st.session_state.selected_pagerank in ["Standard Cells Only", "Macros Only"]:
+    # Show selection and next button
+    if st.session_state.component_type:
         st.markdown("---")
-        area_threshold = st.slider(
-            "Area Threshold",
-            min_value=100,
-            max_value=5000,
-            value=1000,
-            step=100,
-            help="Components with area ≥ threshold are considered macros"
-        )
-    else:
-        area_threshold = 1000
-    
-    # Execute button
-    if st.session_state.selected_pagerank:
-        st.markdown("---")
-        st.markdown(f'<div class="success-box">✅ Selected: <strong>{st.session_state.selected_pagerank}</strong></div>', unsafe_allow_html=True)
+        type_labels = {"global": "🌐 Global", "macro": "📦 Macro", "stdcell": "📱 Standard Cells"}
+        st.markdown(f'<div class="success-box">✅ Selected: <strong>{type_labels[st.session_state.component_type]}</strong></div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         
         with col1:
             if st.button("⬅️ Back to Benchmark Selection", type="secondary"):
                 st.session_state.step = 1
+                st.session_state.component_type = None
+                st.session_state.placement_status = None
+                st.rerun()
+        
+        with col2:
+            if st.session_state.component_type == "global":
+                # Global selected - run PageRank directly
+                if st.button("🚀 Run PageRank Optimization", type="primary"):
+                    run_pagerank_and_proceed()
+            else:
+                # Macro or StdCell selected - go to placement status selection
+                if st.button("➡️ Next: Select Placement Status", type="primary"):
+                    st.session_state.step = 2.5
+                    st.rerun()
+
+
+def show_step2_5_placement_status():
+    """Step 2.5: Select placement status (movable or fixed) for non-global options."""
+    st.markdown('<div class="step-header">Step 2.5: Select Placement Status</div>', unsafe_allow_html=True)
+    
+    type_labels = {"macro": "📦 Macro", "stdcell": "📱 Standard Cells"}
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Component Type: <strong>{type_labels[st.session_state.component_type]}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Select the placement status of components to optimize:")
+    
+    st.markdown("""
+    <div class="info-box">
+    <strong>Placement Status:</strong><br>
+    • <strong>Movable:</strong> Components that can be moved during placement optimization<br>
+    • <strong>Fixed:</strong> Components with fixed positions (terminals, I/O pads)
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Placement status options
+    status_options = {
+        "movable": {
+            "name": "🔄 Movable Components",
+            "description": "Optimize only movable components (non-fixed, non-terminal)"
+        },
+        "fixed": {
+            "name": "📌 Fixed Components",
+            "description": "Optimize only fixed/terminal components"
+        }
+    }
+    
+    # Display options
+    for status, option_info in status_options.items():
+        with st.container():
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.write(f"**{option_info['name']}**")
+                st.caption(option_info['description'])
+            
+            with col2:
+                if st.button(
+                    "Select",
+                    key=f"status_{status}",
+                    use_container_width=True,
+                    type="primary" if st.session_state.placement_status == status else "secondary"
+                ):
+                    st.session_state.placement_status = status
+    
+    # Show selection and action buttons
+    if st.session_state.placement_status:
+        st.markdown("---")
+        status_labels = {"movable": "🔄 Movable", "fixed": "📌 Fixed"}
+        st.markdown(f'<div class="success-box">✅ Selected: <strong>{status_labels[st.session_state.placement_status]}</strong></div>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("⬅️ Back to Component Type", type="secondary"):
+                st.session_state.step = 2
+                st.session_state.placement_status = None
                 st.rerun()
         
         with col2:
             if st.button("🚀 Run PageRank Optimization", type="primary"):
-                script_name = pagerank_options[st.session_state.selected_pagerank]["script"]
-                
-                st.info("🔄 Running PageRank optimization...")
-                
-                # Create container for real-time log
-                log_container = st.container()
-                with log_container:
-                    st.subheader("📋 Execution Log")
-                    log_output = st.empty()
-                
-                success, output = run_pagerank_script(
-                    st.session_state.selected_benchmark,
-                    script_name,
-                    area_threshold,
-                    log_output
-                )
-                
-                if success:
-                    st.success("✅ PageRank optimization completed!")
-                    st.session_state.pagerank_completed = True
-                    st.session_state.step = 3
-                    st.rerun()
-                else:
-                    st.error(f"❌ PageRank optimization failed!")
-                    st.error(output)
+                run_pagerank_and_proceed()
+
+
+def run_pagerank_and_proceed():
+    """Run PageRank optimization and proceed to next step."""
+    st.info("🔄 Running PageRank optimization...")
+    
+    # Create container for real-time log
+    log_container = st.container()
+    with log_container:
+        st.subheader("📋 Execution Log")
+        log_output = st.empty()
+    
+    # Determine placement_status
+    placement_status = st.session_state.placement_status if st.session_state.placement_status else "all"
+    
+    success, output = run_pagerank_script(
+        st.session_state.selected_benchmark,
+        st.session_state.component_type,
+        placement_status,
+        log_output
+    )
+    
+    if success:
+        st.success("✅ PageRank optimization completed!")
+        
+        # Update selected_pagerank for display in later steps
+        type_labels = {"global": "Global", "macro": "Macro", "stdcell": "Standard Cells"}
+        status_labels = {"movable": "Movable", "fixed": "Fixed", "all": "All"}
+        if st.session_state.component_type == "global":
+            st.session_state.selected_pagerank = "Global (All Components)"
+        else:
+            st.session_state.selected_pagerank = f"{type_labels[st.session_state.component_type]} + {status_labels[placement_status]}"
+        
+        st.session_state.pagerank_completed = True
+        st.session_state.step = 3
+        st.rerun()
+    else:
+        st.error("❌ PageRank optimization failed!")
+        st.error(output)
+
 
 def show_step3_run_dreamplace():
     """Step 3: Run DREAMPlace."""
     st.markdown('<div class="step-header">Step 3: Run DREAMPlace</div>', unsafe_allow_html=True)
     
-    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>PageRank: <strong>{st.session_state.selected_pagerank}</strong></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>PageRank Mode: <strong>{st.session_state.selected_pagerank}</strong></div>', unsafe_allow_html=True)
     
     st.write("Click the button below to run DREAMPlace with the optimized placement file.")
     
@@ -554,8 +649,10 @@ def show_step3_run_dreamplace():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("⬅️ Back to PageRank", type="secondary"):
-            st.session_state.step = 2
+        # Go back to the appropriate step
+        back_step = 2.5 if st.session_state.component_type in ["macro", "stdcell"] else 2
+        if st.button("⬅️ Back to PageRank Settings", type="secondary"):
+            st.session_state.step = back_step
             st.rerun()
     
     with col2:
