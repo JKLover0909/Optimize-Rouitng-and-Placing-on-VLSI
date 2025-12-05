@@ -751,7 +751,7 @@ def show_step4_view_results():
         
         # Display image (rotated 180 degrees)
         rotated_img = rotate_image_180(latest_image)
-        st.image(rotated_img, caption=f"Final placement: {os.path.basename(latest_image)}", use_container_width=True)
+        st.image(rotated_img, caption=f"Final placement: {os.path.basename(latest_image)}", use_column_width=True)
         
         # Show image path
         st.info(f"📁 Full path: `{latest_image}`")
@@ -776,7 +776,7 @@ def show_step4_view_results():
                         if idx < len(png_files):
                             with col:
                                 rotated_img = rotate_image_180(png_files[idx])
-                                st.image(rotated_img, caption=os.path.basename(png_files[idx]), use_container_width=True)
+                                st.image(rotated_img, caption=os.path.basename(png_files[idx]), use_column_width=True)
     else:
         st.warning("⚠️ No visualization found. The plot directory may be empty.")
         st.write(f"Expected location: `{RESULTS_DIR}/{st.session_state.selected_benchmark}/plot`")
