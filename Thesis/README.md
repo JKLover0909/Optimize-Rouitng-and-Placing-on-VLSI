@@ -29,3 +29,5 @@ python makePL_movable.py adaptec1
 streamlit run dreamplace_gui.py
 
 python3 dreamplace_console.py
+
+python3 dreamplace_console.py --help
