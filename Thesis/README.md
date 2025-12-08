@@ -31,3 +31,5 @@ streamlit run dreamplace_gui.py
 python3 dreamplace_console.py
 
 python3 dreamplace_console.py --help
+
+python3 dreamplace_console.py test/ispd2005/adaptec1.json --max-iter 1000 --output-place adaptec1_place.pl
