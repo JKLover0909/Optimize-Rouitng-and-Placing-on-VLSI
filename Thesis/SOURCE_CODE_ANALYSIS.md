@@ -1,5 +1,7 @@
 # VLSI Placement Optimization + Routing Analysis - Source Code Analysis
 
+Tieng anh
+
 ## 🏗️ Overall Architecture
 
 Dự án này là một **hệ thống tối ưu hóa vị trí thành phần (placement) trong thiết kế vi mạch VLSI** kết hợp với **phân tích và trực quan hóa kết quả định tuyến (routing)**.
