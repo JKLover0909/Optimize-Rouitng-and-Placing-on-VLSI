@@ -686,7 +686,7 @@ def show_step1_benchmark_selection():
             if st.button(
                 benchmark,
                 key=f"bench_{benchmark}",
-                width='stretch',
+                use_container_width=True,
                 type="primary" if st.session_state.selected_benchmark == benchmark else "secondary"
             ):
                 st.session_state.selected_benchmark = benchmark
@@ -761,7 +761,7 @@ def show_step2_component_type():
                 if st.button(
                     "Select",
                     key=f"comp_{comp_type}",
-                    width='stretch',
+                    use_container_width=True,
                     type="primary" if st.session_state.component_type == comp_type else "secondary"
                 ):
                     st.session_state.component_type = comp_type
@@ -838,7 +838,7 @@ def show_step2_5_placement_status():
                 if st.button(
                     "Select",
                     key=f"status_{status}",
-                    width='stretch',
+                    use_container_width=True,
                     type="primary" if st.session_state.placement_status == status else "secondary"
                 ):
                     st.session_state.placement_status = status
@@ -1016,7 +1016,9 @@ def show_step4_view_results():
         
         # Display image (rotated 180 degrees)
         rotated_img = rotate_image_180(latest_image)
-        st.image(rotated_img, caption=f"Final placement: {os.path.basename(latest_image)}", width='stretch')
+        st.image(rotated_img, caption=f"Final placement: {os.path.basename(latest_image)}", use_column_width=True)
+        
+        # Show image path
         st.info(f"📁 Full path: `{latest_image}`")
         
         # Results directory info
@@ -1039,7 +1041,7 @@ def show_step4_view_results():
                         if idx < len(png_files):
                             with col:
                                 rotated_img = rotate_image_180(png_files[idx])
-                                st.image(rotated_img, caption=os.path.basename(png_files[idx]), width='stretch')
+                                st.image(rotated_img, caption=os.path.basename(png_files[idx]), use_column_width=True)
     else:
         st.warning("⚠️ No visualization found. The plot directory may be empty.")
         st.write(f"Expected location: `{RESULTS_DIR}/{st.session_state.selected_benchmark}/plot`")
@@ -1050,17 +1052,17 @@ def show_step4_view_results():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("🔄 Start New Optimization", type="primary", width='stretch'):
+        if st.button("🔄 Start New Optimization", type="primary", use_container_width=True):
             reset_workflow()
             st.rerun()
     
     with col2:
-        if st.button("📥 Download Results", type="secondary", width='stretch'):
+        if st.button("📥 Download Results", type="secondary", use_container_width=True):
             st.info("Results are saved in the DREAMPlace results directory")
             st.code(f"{RESULTS_DIR}/{st.session_state.selected_benchmark}")
     
     with col3:
-        if st.button("➡️ Continue to Routing", type="secondary", width='stretch'):
+        if st.button("➡️ Continue to Routing", type="secondary", use_container_width=True):
             st.session_state.step = 5
             st.rerun()
 
@@ -1110,7 +1112,7 @@ def show_step5_convert_to_routing():
     
     st.success(f"Found placement file: `{pl_file}`")
     
-    if st.button("🔄 Run Conversion", type="primary", width='stretch'):
+    if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
         progress_container = st.empty()
         
         with st.spinner("Converting placement to routing format..."):
@@ -1141,13 +1143,13 @@ def show_step5_convert_to_routing():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("⬅️ Back to Results", width='stretch'):
+        if st.button("⬅️ Back to Results", use_container_width=True):
             st.session_state.step = 4
             st.rerun()
     
     with col2:
         if st.session_state.get("convert_completed", False):
-            if st.button("➡️ Run Routing", type="primary", width='stretch'):
+            if st.button("➡️ Run Routing", type="primary", use_container_width=True):
                 st.session_state.step = 6
                 st.rerun()
 
@@ -1194,7 +1196,7 @@ def show_step6_run_routing():
 --monotonic-routing=0
     """, language="text")
     
-    if st.button("🚀 Run NthuRoute", type="primary", width='stretch'):
+    if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
         progress_placeholder = st.empty()
         log_placeholder = st.empty()
         
@@ -1247,13 +1249,13 @@ def show_step6_run_routing():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("⬅️ Back to Conversion", width='stretch'):
+        if st.button("⬅️ Back to Conversion", use_container_width=True):
             st.session_state.step = 5
             st.rerun()
     
     with col2:
         if st.session_state.get("routing_completed", False):
-            if st.button("➡️ View Routing Results", type="primary", width='stretch'):
+            if st.button("➡️ View Routing Results", type="primary", use_container_width=True):
                 st.session_state.step = 7
                 st.rerun()
 
@@ -1315,7 +1317,7 @@ def show_step7_view_routing_results():
         for idx, img_path in enumerate(layer_images):
             col_idx = idx % 3
             with cols[col_idx]:
-                st.image(img_path, caption=os.path.basename(img_path), width='stretch')
+                st.image(img_path, caption=os.path.basename(img_path), use_column_width=True)
     else:
         st.info("No routing layer images found.")
     
@@ -1324,7 +1326,7 @@ def show_step7_view_routing_results():
     heatmap_path = os.path.join(output_folder, "congestion_heatmap.png")
     
     if os.path.exists(heatmap_path):
-        st.image(heatmap_path, caption="Congestion Heatmap", width='stretch')
+        st.image(heatmap_path, caption="Congestion Heatmap", use_column_width=True)
     else:
         st.info("Congestion heatmap not found.")
     
@@ -1345,12 +1347,12 @@ def show_step7_view_routing_results():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🔄 Start New Optimization", type="primary", width='stretch'):
+        if st.button("🔄 Start New Optimization", type="primary", use_container_width=True):
             reset_workflow()
             st.rerun()
     
     with col2:
-        if st.button("⬅️ Back to Routing", width='stretch'):
+        if st.button("⬅️ Back to Routing", use_container_width=True):
             st.session_state.step = 6
             st.rerun()
 
