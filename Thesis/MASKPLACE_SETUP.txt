@@ -1,0 +1,271 @@
+#!/bin/bash
+# Complete Setup Guide for VLSI Placement Research Project
+# This script provides step-by-step instructions for setting up all containers
+
+cat << 'EOF'
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║   VLSI PLACEMENT & ROUTING OPTIMIZATION - COMPLETE DOCKER SETUP           ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+PROJECT STRUCTURE:
+==================
+
+/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/
+├── DREAMPlace/                    ← Placement optimizer (Container)
+├── MaskPlace/                     ← RL-based placement (New Container)
+│   ├── Dockerfile                 ← MaskPlace image definition
+│   ├── build-maskplace-image.sh   ← Build script
+│   ├── docker-run-maskplace.sh    ← Run script
+│   ├── run-maskplace.sh           ← Execute MaskPlace
+│   └── DOCKER_SETUP.md            ← Detailed guide
+├── nthu-route/                    ← Global router (Host)
+├── makePL*.py                     ← PageRank ranking (Host)
+├── visualize_routing.py           ← Visualization (Host)
+└── dreamplace_console.py          ← CLI orchestrator (Host)
+
+
+ARCHITECTURE:
+=============
+
+   HOST MACHINE                                  CONTAINERS
+  ════════════════════════════════════════════════════════════════
+
+  🖥️  dreamplace_console.py (Main orchestrator)
+      ├─► makePL*.py (PageRank) ──────────► HOST
+      │   makegraph*.py (Graph analysis)
+      │
+      ├─► run_dreamplace.sh ──────────────► 🐳 DREAMPlace Container
+      │   docker exec → Python → CUDA        limbo018/dreamplace:cuda
+      │
+      ├─► NTHU-Route (Global Router) ────► HOST
+      │   visualize_routing.py
+      │
+      └─► run-maskplace.sh ──────────────► 🐳 MaskPlace Container (NEW)
+          docker exec → Python → CUDA      maskplace:latest
+
+
+QUICK START (5 MINUTES):
+========================
+
+1. Build MaskPlace Docker Image:
+   ─────────────────────────────
+   cd /home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/MaskPlace
+   bash build-maskplace-image.sh
+
+   ✓ Creates: maskplace:latest
+   ✓ Installs: PyTorch, gym, matplotlib, tqdm, protobuf
+   ✓ Base: NVIDIA CUDA 11.8 runtime
+
+
+2. Create Container (Mounts volumes):
+   ───────────────────────────────────
+   bash docker-run-maskplace.sh run
+
+   ✓ Container name: maskplace_dev
+   ✓ Mounts:
+     - /MaskPlace       ← /home/ubuntu/.../MaskPlace
+     - /DREAMPlace      ← /home/ubuntu/.../DREAMPlace (for integration)
+     - /nthu-route      ← /home/ubuntu/.../nthu-route (for integration)
+
+   ✓ Restart policy: unless-stopped (persistent)
+   ✓ GPU support: --gpus all
+
+
+3. Run MaskPlace:
+   ───────────────
+   # From host
+   bash run-maskplace.sh adaptec1
+
+   # Or interactive in container
+   docker attach maskplace_dev
+   cd /MaskPlace/maskplace
+   python PPO2.py --benchmark adaptec1
+
+
+DATA PERSISTENCE:
+=================
+
+✅ ALL DATA PERSISTS because:
+
+   1. Host path mounted as Docker volume
+      /home/ubuntu/.../MaskPlace ← /MaskPlace (bidirectional)
+
+   2. Any file created in container is saved to host
+      Example:
+      - /MaskPlace/maskplace/tb_log/  ← visible on host
+      - /MaskPlace/maskplace/*.pt     ← models persist
+
+   3. Container restart or stop does not affect data
+      docker stop maskplace_dev    ← container stops
+      ls /home/ubuntu/.../MaskPlace/ ← data still there!
+
+   4. Multiple sessions share same data
+      Session 1: Train model
+      Session 2: Test model (using same trained weights)
+
+
+TYPICAL WORKFLOW:
+=================
+
+DAY 1: Training
+────────────────
+$ bash docker-run-maskplace.sh start
+$ bash run-maskplace.sh adaptec1 --pnm 256 --save_fig
+  [Training runs for hours...]
+$ # Detach: Ctrl+P, Ctrl+Q
+
+
+DAY 2: Resume & Test
+─────────────────────
+$ bash docker-run-maskplace.sh start
+$ bash run-maskplace.sh adaptec1 --is_test
+  [Models and logs from Day 1 are still there!]
+
+
+CONTAINER MANAGEMENT:
+=====================
+
+View Status:
+  bash docker-run-maskplace.sh status
+
+Start (after stopping):
+  bash docker-run-maskplace.sh start
+
+Stop:
+  bash docker-run-maskplace.sh stop
+
+Attach to running:
+  docker attach maskplace_dev
+
+Shell access:
+  bash docker-run-maskplace.sh bash
+
+Logs:
+  bash docker-run-maskplace.sh logs
+
+Remove container (keeps data):
+  bash docker-run-maskplace.sh rm
+
+
+VERIFICATION COMMANDS:
+======================
+
+Check GPU visible:
+  docker exec maskplace_dev nvidia-smi
+
+Check PyTorch GPU support:
+  docker exec maskplace_dev python -c "import torch; print(torch.cuda.is_available())"
+
+Verify volume mounting:
+  docker inspect maskplace_dev | grep -A 10 "Mounts"
+
+Check host data:
+  ls -la /home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/MaskPlace/
+
+
+COMMON ISSUES & SOLUTIONS:
+==========================
+
+Issue: "Image maskplace:latest not found"
+  Solution: bash build-maskplace-image.sh
+
+Issue: "Container already exists"
+  Solution: bash docker-run-maskplace.sh start
+
+Issue: "GPU not detected in container"
+  Solution: docker exec maskplace_dev nvidia-smi
+           Rebuild: bash build-maskplace-image.sh
+
+Issue: "Out of GPU memory"
+  Solution: bash run-maskplace.sh adaptec1 --pnm 64
+
+Issue: "Data lost after container restart"
+  Solution: This SHOULD NOT happen with proper volume mounting
+           Check: docker inspect maskplace_dev | grep Mounts
+           Verify: ls /home/ubuntu/.../MaskPlace/
+
+
+FULL INSTALLATION INSTRUCTIONS:
+================================
+
+See detailed documentation:
+  cat DOCKER_SETUP.md
+  cat QUICK_START.sh
+
+
+INTEGRATION WITH OTHER TOOLS:
+==============================
+
+MaskPlace + DREAMPlace:
+  1. Run MaskPlace to place macros
+  2. DREAMPlace auto-called for standard cell placement
+  3. Combined result optimized
+
+MaskPlace + NTHU-Route:
+  1. Get placement from MaskPlace
+  2. Convert to routing format
+  3. Run NTHU-Route
+  4. Visualize with visualize_routing.py
+
+
+DEPENDENCIES INSTALLED:
+=======================
+
+Core:
+  ✓ Python 3.10
+  ✓ NVIDIA CUDA 11.8.0 runtime
+  ✓ cuDNN for CUDA 11.8
+
+ML Frameworks:
+  ✓ PyTorch 2.0+ (with CUDA support)
+  ✓ TorchVision
+  ✓ TorchAudio
+
+MaskPlace specific:
+  ✓ Gym 0.21.0+
+  ✓ Matplotlib 3.7.1+
+  ✓ TQDM
+  ✓ Protobuf (for ariane benchmark)
+
+Utilities:
+  ✓ NumPy
+  ✓ Pandas
+  ✓ TensorBoard
+
+
+NEXT STEPS:
+===========
+
+1. Run setup:
+   cd /home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/MaskPlace
+   bash build-maskplace-image.sh
+   bash docker-run-maskplace.sh run
+
+2. Try training:
+   bash run-maskplace.sh adaptec1
+
+3. Check results:
+   - Logs: /home/ubuntu/.../MaskPlace/tb_log/
+   - Models: /home/ubuntu/.../MaskPlace/maskplace/*.pt
+   - Outputs: /home/ubuntu/.../MaskPlace/maskplace/
+
+4. Read full guide:
+   cat DOCKER_SETUP.md
+
+
+SUPPORT:
+========
+
+For detailed troubleshooting:
+  cat DOCKER_SETUP.md
+
+For quick commands:
+  cat QUICK_START.sh
+
+For MaskPlace usage:
+  bash run-maskplace.sh adaptec1 --help
+
+EOF
