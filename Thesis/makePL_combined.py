@@ -230,18 +230,68 @@ def build_graph(nets, target_components):
     return G
 
 
-def calculate_pagerank(G, alpha=0.85, max_iter=100):
+def calculate_pagerank_centrality(G):
     """Calculate PageRank scores for the graph."""
     if len(G.nodes()) == 0:
         return {}
     
     try:
-        pagerank_scores = nx.pagerank(G, alpha=alpha, max_iter=max_iter, weight='weight')
+        pagerank_scores = nx.pagerank(G, alpha=0.85, max_iter=100, weight='weight')
         return pagerank_scores
     except:
         # If PageRank fails, return uniform scores
         uniform_score = 1.0 / len(G.nodes())
         return {node: uniform_score for node in G.nodes()}
+
+
+def calculate_eigenvector_centrality(G):
+    """Calculate eigenvector centrality scores for the graph."""
+    if len(G.nodes()) == 0:
+        return {}
+    
+    try:
+        eigenvector_scores = nx.eigenvector_centrality(G, weight='weight', max_iter=1000)
+        return eigenvector_scores
+    except:
+        # If eigenvector centrality fails, return uniform scores
+        uniform_score = 1.0 / len(G.nodes())
+        return {node: uniform_score for node in G.nodes()}
+
+
+def calculate_degree_centrality(G):
+    """Calculate degree centrality scores for the graph."""
+    if len(G.nodes()) == 0:
+        return {}
+    
+    try:
+        degree_scores = nx.degree_centrality(G)
+        return degree_scores
+    except:
+        # If degree centrality fails, return uniform scores
+        uniform_score = 1.0 / len(G.nodes())
+        return {node: uniform_score for node in G.nodes()}
+
+
+def calculate_centrality(G, algorithm="pagerank"):
+    """
+    Calculate centrality scores using the specified algorithm.
+    
+    Args:
+        G: NetworkX directed graph
+        algorithm: "pagerank", "eigenvector", or "degree"
+    
+    Returns:
+        Dictionary of node -> centrality_score
+    """
+    if algorithm == "pagerank":
+        return calculate_pagerank_centrality(G)
+    elif algorithm == "eigenvector":
+        return calculate_eigenvector_centrality(G)
+    elif algorithm == "degree":
+        return calculate_degree_centrality(G)
+    else:
+        print(f"Warning: Unknown algorithm '{algorithm}', using PageRank")
+        return calculate_pagerank_centrality(G)
 
 
 def write_pl_file(pl_file, placements):
@@ -256,9 +306,9 @@ def write_pl_file(pl_file, placements):
             f.write(line + "\n")
 
 
-def reorder_placements(placements, target_components, pagerank_scores):
+def reorder_placements(placements, target_components, centrality_scores):
     """
-    Reorder placements: target components sorted by PageRank first,
+    Reorder placements: target components sorted by centrality score first,
     then remaining components in original order.
     """
     # Separate placements
@@ -271,8 +321,8 @@ def reorder_placements(placements, target_components, pagerank_scores):
         else:
             other_placements.append(p)
     
-    # Sort target placements by PageRank score (descending)
-    target_placements.sort(key=lambda p: pagerank_scores.get(p['node'], 0), reverse=True)
+    # Sort target placements by centrality score (descending)
+    target_placements.sort(key=lambda p: centrality_scores.get(p['node'], 0), reverse=True)
     
     # Combine: target first, then others
     return target_placements + other_placements
@@ -280,18 +330,21 @@ def reorder_placements(placements, target_components, pagerank_scores):
 
 def main():
     if len(sys.argv) < 4:
-        print("Usage: python makePL_combined.py <benchmark> <component_type> <placement_status>")
+        print("Usage: python makePL_combined.py <benchmark> <component_type> <placement_status> [ranking_algorithm]")
         print("  component_type: global, macro, stdcell")
         print("  placement_status: all, movable, fixed")
+        print("  ranking_algorithm: pagerank, eigenvector, degree (default: pagerank)")
         print("\nExamples:")
         print("  python makePL_combined.py adaptec1 global all")
-        print("  python makePL_combined.py adaptec1 macro movable")
-        print("  python makePL_combined.py adaptec1 stdcell fixed")
+        print("  python makePL_combined.py adaptec1 global all pagerank")
+        print("  python makePL_combined.py adaptec1 macro movable eigenvector")
+        print("  python makePL_combined.py adaptec1 stdcell fixed degree")
         sys.exit(1)
     
     benchmark = sys.argv[1]
     component_type = sys.argv[2].lower()
     placement_status = sys.argv[3].lower()
+    ranking_algorithm = sys.argv[4].lower() if len(sys.argv) > 4 else "pagerank"
     
     # Validate arguments
     if component_type not in ["global", "macro", "stdcell"]:
@@ -302,6 +355,13 @@ def main():
     if placement_status not in ["all", "movable", "fixed"]:
         print(f"Error: Invalid placement_status '{placement_status}'")
         print("Valid options: all, movable, fixed")
+        sys.exit(1)
+    
+    # Validate ranking algorithm
+    valid_algorithms = ["pagerank", "eigenvector", "degree"]
+    if ranking_algorithm not in valid_algorithms:
+        print(f"Error: Invalid ranking_algorithm '{ranking_algorithm}'")
+        print(f"Valid options: {', '.join(valid_algorithms)}")
         sys.exit(1)
     
     # Build file paths
@@ -318,11 +378,12 @@ def main():
             sys.exit(1)
     
     print(f"=" * 60)
-    print(f"makePL_combined.py - PageRank-based Placement Reordering")
+    print(f"makePL_combined.py - {ranking_algorithm.capitalize()}-based Placement Reordering")
     print(f"=" * 60)
     print(f"Benchmark: {benchmark}")
     print(f"Component type: {component_type}")
     print(f"Placement status: {placement_status}")
+    print(f"Ranking algorithm: {ranking_algorithm}")
     print(f"-" * 60)
     
     # Parse files
@@ -372,19 +433,19 @@ def main():
     print(f"  Nodes: {len(G.nodes())}")
     print(f"  Edges: {len(G.edges())}")
     
-    print("\nCalculating PageRank scores...")
-    pagerank_scores = calculate_pagerank(G)
+    print(f"\nCalculating {ranking_algorithm.upper()} scores...")
+    centrality_scores = calculate_centrality(G, algorithm=ranking_algorithm)
     
-    if pagerank_scores:
+    if centrality_scores:
         # Show top 10 components
-        sorted_scores = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
-        print("\nTop 10 components by PageRank:")
+        sorted_scores = sorted(centrality_scores.items(), key=lambda x: x[1], reverse=True)
+        print(f"\nTop 10 components by {ranking_algorithm.capitalize()}:")
         for i, (node, score) in enumerate(sorted_scores[:10], 1):
             print(f"  {i}. {node}: {score:.6f}")
     
     # Reorder placements
     print("\nReordering placements...")
-    new_placements = reorder_placements(placements, target_components, pagerank_scores)
+    new_placements = reorder_placements(placements, target_components, centrality_scores)
     
     # Write new .pl file
     print(f"\nWriting new .pl file...")

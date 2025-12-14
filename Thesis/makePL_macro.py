@@ -109,18 +109,68 @@ def build_macro_graph(nets, macros):
     
     return G
 
-def calculate_pagerank(G, alpha=0.85, max_iter=100):
+def calculate_pagerank_centrality(G):
     """Calculate PageRank scores for the graph."""
     if len(G.nodes()) == 0:
         return {}
     
     try:
-        pagerank_scores = nx.pagerank(G, alpha=alpha, max_iter=max_iter, weight='weight')
+        pagerank_scores = nx.pagerank(G, alpha=0.85, max_iter=100, weight='weight')
         return pagerank_scores
     except:
         # If PageRank fails, return uniform scores
         uniform_score = 1.0 / len(G.nodes())
         return {node: uniform_score for node in G.nodes()}
+
+
+def calculate_eigenvector_centrality(G):
+    """Calculate eigenvector centrality scores for the graph."""
+    if len(G.nodes()) == 0:
+        return {}
+    
+    try:
+        eigenvector_scores = nx.eigenvector_centrality(G, weight='weight', max_iter=1000)
+        return eigenvector_scores
+    except:
+        # If eigenvector centrality fails, return uniform scores
+        uniform_score = 1.0 / len(G.nodes())
+        return {node: uniform_score for node in G.nodes()}
+
+
+def calculate_degree_centrality(G):
+    """Calculate degree centrality scores for the graph."""
+    if len(G.nodes()) == 0:
+        return {}
+    
+    try:
+        degree_scores = nx.degree_centrality(G)
+        return degree_scores
+    except:
+        # If degree centrality fails, return uniform scores
+        uniform_score = 1.0 / len(G.nodes())
+        return {node: uniform_score for node in G.nodes()}
+
+
+def calculate_centrality(G, algorithm="pagerank"):
+    """
+    Calculate centrality scores using the specified algorithm.
+    
+    Args:
+        G: NetworkX directed graph
+        algorithm: "pagerank", "eigenvector", or "degree"
+    
+    Returns:
+        Dictionary of node -> centrality_score
+    """
+    if algorithm == "pagerank":
+        return calculate_pagerank_centrality(G)
+    elif algorithm == "eigenvector":
+        return calculate_eigenvector_centrality(G)
+    elif algorithm == "degree":
+        return calculate_degree_centrality(G)
+    else:
+        print(f"Warning: Unknown algorithm '{algorithm}', using PageRank")
+        return calculate_pagerank_centrality(G)
 
 def parse_pl_file(pl_file):
     """Parse .pl file and extract placement information."""
@@ -164,12 +214,24 @@ def write_pl_file(pl_file, placements):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python makePL_macro.py <benchmark_name> [area_threshold]")
+        print("Usage: python makePL_macro.py <benchmark_name> [area_threshold] [ranking_algorithm]")
+        print("  area_threshold: default 1000")
+        print("  ranking_algorithm: pagerank, eigenvector, degree (default: pagerank)")
+        print("Example: python makePL_macro.py adaptec1")
         print("Example: python makePL_macro.py adaptec1 1000")
+        print("Example: python makePL_macro.py adaptec1 1000 eigenvector")
         sys.exit(1)
     
     benchmark = sys.argv[1]
     area_threshold = float(sys.argv[2]) if len(sys.argv) > 2 else 1000
+    ranking_algorithm = sys.argv[3].lower() if len(sys.argv) > 3 else "pagerank"
+    
+    # Validate ranking algorithm
+    valid_algorithms = ["pagerank", "eigenvector", "degree"]
+    if ranking_algorithm not in valid_algorithms:
+        print(f"Error: Invalid ranking_algorithm '{ranking_algorithm}'")
+        print(f"Valid options: {', '.join(valid_algorithms)}")
+        sys.exit(1)
     
     # File paths
     base_dir = "DREAMPlace/install/benchmarks/ispd2005"
@@ -178,9 +240,10 @@ def main():
     nets_file = f"{benchmark_dir}/{benchmark}.nets"
     pl_file = f"{benchmark_dir}/{benchmark}.pl"
     
-    print(f"=== MACRO-ONLY PageRank PL Reordering ===")
+    print(f"=== MACRO-ONLY {ranking_algorithm.capitalize()} PL Reordering ===")
     print(f"Benchmark: {benchmark}")
     print(f"Area threshold: {area_threshold}")
+    print(f"Ranking algorithm: {ranking_algorithm}")
     print()
     
     # Step 1: Parse nodes to identify macros
@@ -204,13 +267,13 @@ def main():
     print(f"  Graph edges: {G.number_of_edges()}")
     print()
     
-    # Step 4: Calculate PageRank
-    print("Step 4: Calculating PageRank...")
-    pagerank_scores = calculate_pagerank(G)
+    # Step 4: Calculate centrality scores
+    print(f"Step 4: Calculating {ranking_algorithm.capitalize()} scores...")
+    centrality_scores = calculate_centrality(G, algorithm=ranking_algorithm)
     
-    if pagerank_scores:
-        sorted_macros = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
-        print(f"  Top 5 macros by PageRank:")
+    if centrality_scores:
+        sorted_macros = sorted(centrality_scores.items(), key=lambda x: x[1], reverse=True)
+        print(f"  Top 5 macros by {ranking_algorithm.capitalize()}:")
         for i, (node, score) in enumerate(sorted_macros[:5], 1):
             print(f"    {i}. {node}: {score:.8f}")
     print()
@@ -232,13 +295,13 @@ def main():
         else:
             other_placements.append(placement)
     
-    # Sort macros by PageRank (descending)
+    # Sort macros by centrality score (descending)
     macro_placements.sort(
-        key=lambda p: pagerank_scores.get(p['node'], 0),
+        key=lambda p: centrality_scores.get(p['node'], 0),
         reverse=True
     )
     
-    # Combine: macros first (sorted by PageRank), then others (original order)
+    # Combine: macros first (sorted by centrality), then others (original order)
     reordered_placements = macro_placements + other_placements
     
     print(f"  Macros (sorted by PageRank): {len(macro_placements)}")

@@ -105,6 +105,8 @@ if 'selected_pagerank' not in st.session_state:
     st.session_state.selected_pagerank = None
 if 'component_type' not in st.session_state:
     st.session_state.component_type = None  # "global", "macro", "stdcell"
+if 'ranking_algorithm' not in st.session_state:
+    st.session_state.ranking_algorithm = "pagerank"  # "pagerank", "eigenvector", "degree"
 if 'placement_status' not in st.session_state:
     st.session_state.placement_status = None  # "movable", "fixed"
 if 'pagerank_completed' not in st.session_state:
@@ -159,7 +161,7 @@ def restore_original_pl(benchmark):
         return True
     return False
 
-def run_pagerank_script(benchmark, component_type, placement_status, output_container=None):
+def run_pagerank_script(benchmark, component_type, placement_status, ranking_algorithm="pagerank", output_container=None):
     """Run PageRank script using the combined script."""
     script_path = f"{SCRIPTS_DIR}/makePL_combined.py"
     
@@ -170,10 +172,10 @@ def run_pagerank_script(benchmark, component_type, placement_status, output_cont
         # Restore original .pl before running PageRank
         restore_original_pl(benchmark)
         
-        # Build command with component_type and placement_status
+        # Build command with component_type, placement_status, and ranking_algorithm
         # For global, placement_status should be "all"
         status = "all" if component_type == "global" else placement_status
-        cmd = ['python3', script_path, benchmark, component_type, status]
+        cmd = ['python3', script_path, benchmark, component_type, status, ranking_algorithm]
         
         # Run with real-time output
         process = subprocess.Popen(
@@ -208,7 +210,7 @@ def run_pagerank_script(benchmark, component_type, placement_status, output_cont
     except Exception as e:
         return False, str(e)
 
-def run_dreamplace(benchmark, output_container=None):
+def run_dreamplace(benchmark, ranking_algorithm="pagerank", output_container=None):
     """Run DREAMPlace using the run_dreamplace.sh script."""
     script_path = f"{SCRIPTS_DIR}/run_dreamplace.sh"
     
@@ -251,7 +253,23 @@ def run_dreamplace(benchmark, output_container=None):
             # Log exists but can't write - will try to read it anyway
             pass
         
+        # Rename output placement file based on ranking algorithm
         if process.returncode == 0:
+            try:
+                # Rename .pl file to indicate which algorithm was used
+                algo_suffix = {"pagerank": "pagerank", "eigenvector": "eigenvector", "degree": "degree"}
+                suffix = algo_suffix.get(ranking_algorithm, "pagerank")
+                
+                original_pl = f"{RESULTS_DIR}/{benchmark}/placement.pl"
+                renamed_pl = f"{RESULTS_DIR}/{benchmark}/placed_{suffix}.pl"
+                
+                if os.path.exists(original_pl):
+                    shutil.copy2(original_pl, renamed_pl)
+                    # Keep original as well for backward compatibility
+            except Exception as e:
+                # Non-critical - continue even if rename fails
+                pass
+            
             return True, full_output
         else:
             return False, full_output
@@ -425,8 +443,8 @@ def run_placement_to_routing_converter(benchmark, output_dir, output_container=N
         return False, str(e), None
 
 
-def run_nthu_route(input_gr_file, output_dir, output_container=None):
-    """Run NTHU-Route global router."""
+def run_nthu_route(input_gr_file, output_dir, output_container=None, routing_config=None):
+    """Run NTHU-Route global router with configurable parameters."""
     
     nthu_route_exe = os.path.join(THESIS_DIR, NTHU_ROUTE_DIR, "NthuRoute")
     # FLUTE data files are in parent directory (nthu-route/), not nthuRouter3/
@@ -442,19 +460,34 @@ def run_nthu_route(input_gr_file, output_dir, output_container=None):
     if not os.path.exists(powv_file) or not os.path.exists(post_file):
         return False, f"FLUTE data files (POWV9.dat, POST9.dat) not found in {nthu_route_cwd}", {}
     
+    # Use routing_config if provided, otherwise use default NTHU_PARAMS
+    if routing_config:
+        params = {
+            'p2_max_iteration': routing_config['p2_max_iter'],
+            'p2_init_box_size': routing_config['p2_init_box'],
+            'p2_box_expand_size': 1,
+            'overflow_threshold': routing_config['overflow_threshold'],
+            'p3_max_iteration': routing_config['p3_max_iter'],
+            'p3_init_box_size': routing_config['p3_init_box'],
+            'p3_box_expand_size': routing_config['p3_box_expand'],
+            'monotonic_routing': 0
+        }
+    else:
+        params = NTHU_PARAMS
+    
     # Build command
     cmd = [
         nthu_route_exe,
         f"--input={input_gr_file}",
         f"--output={output_file}",
-        f"--p2-max-iteration={NTHU_PARAMS['p2_max_iteration']}",
-        f"--p2-init-box-size={NTHU_PARAMS['p2_init_box_size']}",
-        f"--p2-box-expand-size={NTHU_PARAMS['p2_box_expand_size']}",
-        f"--overflow-threshold={NTHU_PARAMS['overflow_threshold']}",
-        f"--p3-max-iteration={NTHU_PARAMS['p3_max_iteration']}",
-        f"--p3-init-box-size={NTHU_PARAMS['p3_init_box_size']}",
-        f"--p3-box-expand-size={NTHU_PARAMS['p3_box_expand_size']}",
-        f"--monotonic-routing={NTHU_PARAMS['monotonic_routing']}"
+        f"--p2-max-iteration={params['p2_max_iteration']}",
+        f"--p2-init-box-size={params['p2_init_box_size']}",
+        f"--p2-box-expand-size={params['p2_box_expand_size']}",
+        f"--overflow-threshold={params['overflow_threshold']}",
+        f"--p3-max-iteration={params['p3_max_iteration']}",
+        f"--p3-init-box-size={params['p3_init_box_size']}",
+        f"--p3-box-expand-size={params['p3_box_expand_size']}",
+        f"--monotonic-routing={params['monotonic_routing']}"
     ]
     
     try:
@@ -583,6 +616,13 @@ def main():
         else:
             st.info("⏳ Step 2: Component Type")
         
+        # Show step 2.3 if component type is not none
+        if st.session_state.component_type and st.session_state.component_type != "none":
+            if st.session_state.step >= 2.3:
+                st.success("✅ Step 2.3: Ranking Algorithm")
+            else:
+                st.info("⏳ Step 2.3: Ranking Algorithm")
+        
         # Show step 2.5 only if macro or stdcell is selected
         if st.session_state.component_type in ["macro", "stdcell"]:
             if st.session_state.step >= 2.5:
@@ -647,6 +687,8 @@ def main():
         show_step1_benchmark_selection()
     elif st.session_state.step == 2:
         show_step2_component_type()
+    elif st.session_state.step == 2.3:
+        show_step2_3_ranking_algorithm()
     elif st.session_state.step == 2.5:
         show_step2_5_placement_status()
     elif st.session_state.step == 3:
@@ -715,6 +757,86 @@ def show_step1_benchmark_selection():
         if st.button("➡️ Next: Select Component Type", type="primary"):
             st.session_state.step = 2
             st.rerun()
+
+def show_step2_3_ranking_algorithm():
+    """Step 2.3: Select ranking algorithm for component prioritization."""
+    st.markdown('<div class="step-header">Step 2.3: Select Ranking Algorithm</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Component Type: <strong>Global (All Components)</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Choose a ranking algorithm to prioritize components for placement optimization:")
+    
+    st.markdown("""
+    <div class="info-box">
+    <strong>Ranking Algorithms:</strong><br>
+    • <strong>PageRank:</strong> Graph-based ranking based on connectivity importance (recommended, 7.64% better than Eigenvector)<br>
+    • <strong>Eigenvector Centrality:</strong> Emphasizes nodes connected to other important nodes<br>
+    • <strong>Degree Centrality:</strong> Simple ranking by connection count
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Algorithm options
+    algorithms = {
+        "pagerank": {
+            "label": "🔗 PageRank (Recommended)",
+            "description": "Graph-based ranking - emphasizes nodes with high-quality connections",
+            "accuracy": "7.64% better than Eigenvector"
+        },
+        "eigenvector": {
+            "label": "📊 Eigenvector Centrality",
+            "description": "Node importance from connected node values",
+            "accuracy": "Baseline"
+        },
+        "degree": {
+            "label": "📍 Degree Centrality",
+            "description": "Simple ranking by number of connections",
+            "accuracy": "6.77% lower than PageRank"
+        }
+    }
+    
+    # Display options as buttons
+    for algo_id, algo_info in algorithms.items():
+        with st.container():
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.write(f"**{algo_info['label']}**")
+                st.caption(algo_info['description'])
+                st.caption(f"📈 Relative Performance: {algo_info['accuracy']}")
+            
+            with col2:
+                if st.button(
+                    "Select",
+                    key=f"algo_{algo_id}",
+                    use_container_width=True,
+                    type="primary" if st.session_state.ranking_algorithm == algo_id else "secondary"
+                ):
+                    st.session_state.ranking_algorithm = algo_id
+    
+    # Show selection and action buttons
+    if st.session_state.ranking_algorithm:
+        st.markdown("---")
+        algo_labels = {
+            "pagerank": "🔗 PageRank",
+            "eigenvector": "📊 Eigenvector Centrality",
+            "degree": "📍 Degree Centrality"
+        }
+        st.markdown(f'<div class="success-box">✅ Selected: <strong>{algo_labels[st.session_state.ranking_algorithm]}</strong></div>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("⬅️ Back to Component Type", type="secondary"):
+                st.session_state.step = 2
+                st.rerun()
+        
+        with col2:
+            if st.button("➡️ Next: Placement Status" if st.session_state.component_type in ["macro", "stdcell"] else "🚀 Run PageRank Optimization", type="primary"):
+                if st.session_state.component_type in ["macro", "stdcell"]:
+                    st.session_state.step = 2.5
+                else:
+                    run_pagerank_and_proceed()
+                st.rerun()
 
 def show_step2_component_type():
     """Step 2: Select component type for PageRank optimization."""
@@ -791,16 +913,17 @@ def show_step2_component_type():
         with col2:
             if st.session_state.component_type == "none":
                 # None selected - skip PageRank, use original placement
-                if st.button("⏭️ Skip to DREAMPlace (No PageRank)", type="primary"):
+                if st.button("⏭️ Skip to DREAMPlace (No Ranking)", type="primary"):
                     skip_pagerank_and_proceed()
             elif st.session_state.component_type == "global":
-                # Global selected - run PageRank directly
-                if st.button("🚀 Run PageRank Optimization", type="primary"):
-                    run_pagerank_and_proceed()
+                # Global selected - go to algorithm selection
+                if st.button("➡️ Next: Select Ranking Algorithm", type="primary"):
+                    st.session_state.step = 2.3
+                    st.rerun()
             else:
-                # Macro or StdCell selected - go to placement status selection
-                if st.button("➡️ Next: Select Placement Status", type="primary"):
-                    st.session_state.step = 2.5
+                # Macro or StdCell selected - go to algorithm selection first
+                if st.button("➡️ Next: Select Ranking Algorithm", type="primary"):
+                    st.session_state.step = 2.3
                     st.rerun()
 
 
@@ -906,6 +1029,7 @@ def run_pagerank_and_proceed():
         st.session_state.selected_benchmark,
         st.session_state.component_type,
         placement_status,
+        st.session_state.ranking_algorithm,
         log_output
     )
     
@@ -915,10 +1039,12 @@ def run_pagerank_and_proceed():
         # Update selected_pagerank for display in later steps
         type_labels = {"global": "Global", "macro": "Macro", "stdcell": "Standard Cells"}
         status_labels = {"movable": "Movable", "fixed": "Fixed", "all": "All"}
+        algo_labels = {"pagerank": "PageRank", "eigenvector": "Eigenvector Centrality", "degree": "Degree Centrality"}
+        
         if st.session_state.component_type == "global":
-            st.session_state.selected_pagerank = "Global (All Components)"
+            st.session_state.selected_pagerank = f"Global (All Components) - {algo_labels[st.session_state.ranking_algorithm]}"
         else:
-            st.session_state.selected_pagerank = f"{type_labels[st.session_state.component_type]} + {status_labels[placement_status]}"
+            st.session_state.selected_pagerank = f"{type_labels[st.session_state.component_type]} + {status_labels[placement_status]} - {algo_labels[st.session_state.ranking_algorithm]}"
         
         st.session_state.pagerank_completed = True
         st.session_state.step = 3
@@ -942,8 +1068,8 @@ def show_step3_run_dreamplace():
     
     with col1:
         # Go back to the appropriate step
-        back_step = 2.5 if st.session_state.component_type in ["macro", "stdcell"] else 2
-        if st.button("⬅️ Back to PageRank Settings", type="secondary"):
+        back_step = 2.5 if st.session_state.component_type in ["macro", "stdcell"] else 2.3
+        if st.button("⬅️ Back to Ranking Algorithm", type="secondary"):
             st.session_state.step = back_step
             st.rerun()
     
@@ -957,7 +1083,7 @@ def show_step3_run_dreamplace():
                 st.subheader("📋 DREAMPlace Execution Log")
                 log_output = st.empty()
             
-            success, output = run_dreamplace(st.session_state.selected_benchmark, log_output)
+            success, output = run_dreamplace(st.session_state.selected_benchmark, st.session_state.ranking_algorithm, log_output)
             
             if success:
                 st.success("✅ DREAMPlace execution completed!")
@@ -1210,25 +1336,90 @@ def show_step6_run_routing():
     **Output folder:** {output_folder}
     """)
     
-    # Display NthuRoute parameters
-    st.subheader("NthuRoute Parameters")
-    st.code("""
---p2-max-iteration=150
---p2-init-box-size=25
+    # Routing Preset Selection
+    st.subheader("🎯 Routing Configuration")
+    
+    # Define routing presets
+    routing_presets = {
+        "⚡ Fast (5-10 phút)": {
+            "p2_max_iter": 50,
+            "p2_init_box": 15,
+            "overflow_threshold": 0.05,
+            "p3_max_iter": 10,
+            "p3_init_box": 8,
+            "p3_box_expand": 10,
+            "description": "Tốc độ cao, chất lượng chấp nhận được. Phù hợp cho testing nhanh."
+        },
+        "⚖️ Balanced (10-20 phút)": {
+            "p2_max_iter": 150,
+            "p2_init_box": 25,
+            "overflow_threshold": 0,
+            "p3_max_iter": 20,
+            "p3_init_box": 10,
+            "p3_box_expand": 15,
+            "description": "Cân bằng giữa tốc độ và chất lượng. Mặc định được khuyến nghị."
+        },
+        "💎 Quality (30-60 phút)": {
+            "p2_max_iter": 300,
+            "p2_init_box": 30,
+            "overflow_threshold": 0,
+            "p3_max_iter": 50,
+            "p3_init_box": 15,
+            "p3_box_expand": 20,
+            "description": "Chất lượng cao nhất, thời gian dài. Dùng cho kết quả cuối cùng."
+        }
+    }
+    
+    selected_preset = st.selectbox(
+        "Chọn Preset:",
+        options=list(routing_presets.keys()),
+        index=1  # Default to Balanced
+    )
+    
+    preset_config = routing_presets[selected_preset]
+    
+    st.info(f"📝 {preset_config['description']}")
+    
+    # Display NthuRoute parameters in expandable section
+    with st.expander("🔧 Xem Chi Tiết Tham Số"):
+        st.subheader("Phase 2 (Global Routing)")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Max Iterations", preset_config['p2_max_iter'])
+            st.metric("Initial Box Size", preset_config['p2_init_box'])
+        with col2:
+            st.metric("Overflow Threshold", f"{preset_config['overflow_threshold']:.2f}")
+            st.caption("Càng thấp = chất lượng cao, thời gian dài")
+        
+        st.subheader("Phase 3 (Optimization)")
+        col3, col4 = st.columns(2)
+        with col3:
+            st.metric("Max Iterations", preset_config['p3_max_iter'])
+            st.metric("Initial Box Size", preset_config['p3_init_box'])
+        with col4:
+            st.metric("Box Expand Size", preset_config['p3_box_expand'])
+        
+        st.code(f"""--p2-max-iteration={preset_config['p2_max_iter']}
+--p2-init-box-size={preset_config['p2_init_box']}
 --p2-box-expand-size=1
---overflow-threshold=0
---p3-max-iteration=20
---p3-init-box-size=10
---p3-box-expand-size=15
---monotonic-routing=0
-    """, language="text")
+--overflow-threshold={preset_config['overflow_threshold']}
+--p3-max-iteration={preset_config['p3_max_iter']}
+--p3-init-box-size={preset_config['p3_init_box']}
+--p3-box-expand-size={preset_config['p3_box_expand']}
+--monotonic-routing=0""", language="text")
+    
+    # Store preset config in session state for use in routing execution
+    st.session_state.routing_preset_config = preset_config
     
     if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
         progress_placeholder = st.empty()
         log_placeholder = st.empty()
         
-        with st.spinner("Running NthuRoute... This may take a while."):
-            success, output, metrics = run_nthu_route(gr_file, output_folder, log_placeholder)
+        # Get routing config from session state
+        routing_config = st.session_state.get('routing_preset_config', preset_config)
+        
+        with st.spinner(f"Running NthuRoute với preset: {selected_preset}... Thời gian dự kiến: {selected_preset.split('(')[1].split(')')[0]}"):
+            success, output, metrics = run_nthu_route(gr_file, output_folder, log_placeholder, routing_config)
             
             if success:
                 st.success("✅ Routing completed successfully!")
