@@ -734,6 +734,10 @@ def show_step2_component_type():
     
     # Component type options
     component_options = {
+        "none": {
+            "name": "🚫 None (No PageRank)",
+            "description": "Skip PageRank optimization - use original placement"
+        },
         "global": {
             "name": "🌐 Global (All Components)",
             "description": "Sort ALL components by PageRank score regardless of type"
@@ -765,14 +769,14 @@ def show_step2_component_type():
                     type="primary" if st.session_state.component_type == comp_type else "secondary"
                 ):
                     st.session_state.component_type = comp_type
-                    # If global is selected, clear placement_status
-                    if comp_type == "global":
+                    # If global or none is selected, clear placement_status
+                    if comp_type in ["global", "none"]:
                         st.session_state.placement_status = None
     
     # Show selection and next button
     if st.session_state.component_type:
         st.markdown("---")
-        type_labels = {"global": "🌐 Global", "macro": "📦 Macro", "stdcell": "📱 Standard Cells"}
+        type_labels = {"none": "🚫 None", "global": "🌐 Global", "macro": "📦 Macro", "stdcell": "📱 Standard Cells"}
         st.markdown(f'<div class="success-box">✅ Selected: <strong>{type_labels[st.session_state.component_type]}</strong></div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
@@ -785,7 +789,11 @@ def show_step2_component_type():
                 st.rerun()
         
         with col2:
-            if st.session_state.component_type == "global":
+            if st.session_state.component_type == "none":
+                # None selected - skip PageRank, use original placement
+                if st.button("⏭️ Skip to DREAMPlace (No PageRank)", type="primary"):
+                    skip_pagerank_and_proceed()
+            elif st.session_state.component_type == "global":
                 # Global selected - run PageRank directly
                 if st.button("🚀 Run PageRank Optimization", type="primary"):
                     run_pagerank_and_proceed()
@@ -860,6 +868,25 @@ def show_step2_5_placement_status():
         with col2:
             if st.button("🚀 Run PageRank Optimization", type="primary"):
                 run_pagerank_and_proceed()
+
+
+def skip_pagerank_and_proceed():
+    """Skip PageRank optimization and use original placement."""
+    st.info("⏭️ Skipping PageRank optimization...")
+    
+    benchmark = st.session_state.selected_benchmark
+    
+    # Restore original .pl file
+    if restore_original_pl(benchmark):
+        st.success("✅ Original placement file restored!")
+    else:
+        st.warning("⚠️ No backup found, using current placement file")
+    
+    # Set session state
+    st.session_state.selected_pagerank = "No PageRank (Original Placement)"
+    st.session_state.pagerank_completed = False  # Mark as not using PageRank
+    st.session_state.step = 3
+    st.rerun()
 
 
 def run_pagerank_and_proceed():
