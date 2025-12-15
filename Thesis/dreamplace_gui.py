@@ -30,7 +30,7 @@ NTHU_ROUTE_BINARY = os.path.join(THESIS_DIR, NTHU_ROUTE_DIR, "NthuRoute")
 TILE_SIZE = 35
 ADJUSTMENT_FACTOR = 50
 SAFE_GUARD_FACTOR = 90
-ROUTING_MODE = 2  # 2 layers
+ROUTING_MODE = 3  # 6 layers (matching adaptec1.capo70.3d.35.50.90.gr format)
 
 # NthuRoute parameters (fixed)
 NTHU_PARAMS = {
@@ -1370,56 +1370,43 @@ def show_step6_run_routing():
         }
     }
     
-    selected_preset = st.selectbox(
-        "Chọn Preset:",
-        options=list(routing_presets.keys()),
-        index=1  # Default to Balanced
-    )
-    
-    preset_config = routing_presets[selected_preset]
-    
-    st.info(f"📝 {preset_config['description']}")
-    
-    # Display NthuRoute parameters in expandable section
-    with st.expander("🔧 Xem Chi Tiết Tham Số"):
+    # Fixed routing parameters (no presets to avoid routing errors)
+    st.info("📝 Sử dụng tham số cố định để tránh lỗi routing.")
+
+    with st.expander("🔧 Tham số cố định NthuRoute"):
         st.subheader("Phase 2 (Global Routing)")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Max Iterations", preset_config['p2_max_iter'])
-            st.metric("Initial Box Size", preset_config['p2_init_box'])
+            st.metric("Max Iterations", NTHU_PARAMS['p2_max_iteration'])
+            st.metric("Initial Box Size", NTHU_PARAMS['p2_init_box_size'])
         with col2:
-            st.metric("Overflow Threshold", f"{preset_config['overflow_threshold']:.2f}")
-            st.caption("Càng thấp = chất lượng cao, thời gian dài")
-        
+            st.metric("Overflow Threshold", f"{NTHU_PARAMS['overflow_threshold']}")
+            st.caption("Giữ cố định để đảm bảo tính ổn định")
+
         st.subheader("Phase 3 (Optimization)")
         col3, col4 = st.columns(2)
         with col3:
-            st.metric("Max Iterations", preset_config['p3_max_iter'])
-            st.metric("Initial Box Size", preset_config['p3_init_box'])
+            st.metric("Max Iterations", NTHU_PARAMS['p3_max_iteration'])
+            st.metric("Initial Box Size", NTHU_PARAMS['p3_init_box_size'])
         with col4:
-            st.metric("Box Expand Size", preset_config['p3_box_expand'])
-        
-        st.code(f"""--p2-max-iteration={preset_config['p2_max_iter']}
---p2-init-box-size={preset_config['p2_init_box']}
---p2-box-expand-size=1
---overflow-threshold={preset_config['overflow_threshold']}
---p3-max-iteration={preset_config['p3_max_iter']}
---p3-init-box-size={preset_config['p3_init_box']}
---p3-box-expand-size={preset_config['p3_box_expand']}
---monotonic-routing=0""", language="text")
-    
-    # Store preset config in session state for use in routing execution
-    st.session_state.routing_preset_config = preset_config
-    
+            st.metric("Box Expand Size", NTHU_PARAMS['p3_box_expand_size'])
+
+        st.code(f"""--p2-max-iteration={NTHU_PARAMS['p2_max_iteration']}
+--p2-init-box-size={NTHU_PARAMS['p2_init_box_size']}
+--p2-box-expand-size={NTHU_PARAMS['p2_box_expand_size']}
+--overflow-threshold={NTHU_PARAMS['overflow_threshold']}
+--p3-max-iteration={NTHU_PARAMS['p3_max_iteration']}
+--p3-init-box-size={NTHU_PARAMS['p3_init_box_size']}
+--p3-box-expand-size={NTHU_PARAMS['p3_box_expand_size']}
+--monotonic-routing={NTHU_PARAMS['monotonic_routing']}""", language="text")
+
     if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
         progress_placeholder = st.empty()
         log_placeholder = st.empty()
         
-        # Get routing config from session state
-        routing_config = st.session_state.get('routing_preset_config', preset_config)
-        
-        with st.spinner(f"Running NthuRoute với preset: {selected_preset}... Thời gian dự kiến: {selected_preset.split('(')[1].split(')')[0]}"):
-            success, output, metrics = run_nthu_route(gr_file, output_folder, log_placeholder, routing_config)
+        # Run with fixed NTHU_PARAMS (no presets)
+        with st.spinner("Running NthuRoute với tham số cố định..."):
+            success, output, metrics = run_nthu_route(gr_file, output_folder, log_placeholder, routing_config=None)
             
             if success:
                 st.success("✅ Routing completed successfully!")
