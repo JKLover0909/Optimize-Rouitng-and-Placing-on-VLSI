@@ -16,13 +16,15 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from datetime import datetime
 
-# Configuration
-THESIS_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = "DREAMPlace/install"
-BENCHMARKS_DIR = f"{BASE_DIR}/benchmarks/ispd2005"
-RESULTS_DIR = f"{BASE_DIR}/results"
-ROUTING_RESULTS_DIR = "routing_results"
-SCRIPTS_DIR = "."
+# Paths (absolute to the Thesis root)
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+THESIS_DIR = os.path.abspath(os.path.join(SRC_DIR, ".."))
+BASE_DIR = os.path.join(THESIS_DIR, "DREAMPlace", "install")
+BENCHMARKS_DIR = os.path.join(BASE_DIR, "benchmarks", "ispd2005")
+RESULTS_DIR = os.path.join(BASE_DIR, "results")
+ROUTING_RESULTS_DIR = os.path.join(THESIS_DIR, "routing_results")
+ROUTING_VISUALIZE_DIR = os.path.join(THESIS_DIR, "routing_visualize")
+SCRIPTS_DIR = THESIS_DIR  # Use project root as cwd for shell/Python helpers
 NTHU_ROUTE_DIR = "nthu-route/nthuRouter3"
 NTHU_ROUTE_BINARY = os.path.join(THESIS_DIR, NTHU_ROUTE_DIR, "NthuRoute")
 
@@ -121,6 +123,8 @@ if 'routing_completed' not in st.session_state:
     st.session_state.routing_completed = False
 if 'convert_completed' not in st.session_state:
     st.session_state.convert_completed = False
+if 'routing_visualize_dir' not in st.session_state:
+    st.session_state.routing_visualize_dir = None
 
 def get_available_benchmarks():
     """Scan and return all available benchmarks in ispd2005 folder."""
@@ -163,7 +167,7 @@ def restore_original_pl(benchmark):
 
 def run_pagerank_script(benchmark, component_type, placement_status, ranking_algorithm="pagerank", output_container=None):
     """Run PageRank script using the combined script."""
-    script_path = f"{SCRIPTS_DIR}/makePL_combined.py"
+    script_path = os.path.join(SRC_DIR, "makePL_combined.py")
     
     if not os.path.exists(script_path):
         return False, f"Script not found: {script_path}"
@@ -180,7 +184,7 @@ def run_pagerank_script(benchmark, component_type, placement_status, ranking_alg
         # Run with real-time output
         process = subprocess.Popen(
             cmd,
-            cwd=SCRIPTS_DIR,
+            cwd=THESIS_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -212,7 +216,7 @@ def run_pagerank_script(benchmark, component_type, placement_status, ranking_alg
 
 def run_dreamplace(benchmark, ranking_algorithm="pagerank", output_container=None):
     """Run DREAMPlace using the run_dreamplace.sh script."""
-    script_path = f"{SCRIPTS_DIR}/run_dreamplace.sh"
+    script_path = os.path.join(THESIS_DIR, "run_dreamplace.sh")
     
     if not os.path.exists(script_path):
         return False, f"Script not found: {script_path}"
@@ -221,7 +225,7 @@ def run_dreamplace(benchmark, ranking_algorithm="pagerank", output_container=Non
         # Run with real-time output
         process = subprocess.Popen(
             ['bash', script_path, benchmark],
-            cwd=SCRIPTS_DIR,
+            cwd=THESIS_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -377,6 +381,7 @@ def reset_workflow():
     st.session_state.routing_output_dir = None
     st.session_state.routing_completed = False
     st.session_state.convert_completed = False
+    st.session_state.routing_visualize_dir = None
 
 
 def get_routing_output_dir_name():
@@ -550,49 +555,55 @@ def run_nthu_route(input_gr_file, output_dir, output_container=None, routing_con
         return False, str(e), {}
 
 
-def run_routing_visualization(routing_output_file, output_dir, output_container=None):
-    """Run visualization script on routing output."""
-    
-    visualize_script = f"{SCRIPTS_DIR}/visualize_routing.py"
-    
+def run_routing_visualization(routing_output_file, run_output_dir, output_container=None):
+    """Run visualization script on routing output and save into routing_visualize/<run>."""
+
+    visualize_script = os.path.join(SRC_DIR, "visualize_routing.py")
+    visualization_dir = os.path.join(
+        ROUTING_VISUALIZE_DIR,
+        os.path.basename(os.path.abspath(run_output_dir.rstrip(os.sep)))
+    )
+
     if not os.path.exists(visualize_script):
-        return False, f"Visualization script not found: {visualize_script}"
-    
+        return False, f"Visualization script not found: {visualize_script}", None
+
+    os.makedirs(visualization_dir, exist_ok=True)
+
     cmd = [
         'python3', visualize_script,
         '--input', routing_output_file,
-        '--output-dir', output_dir
+        '--output-dir', visualization_dir
     ]
-    
+
     try:
         process = subprocess.Popen(
             cmd,
-            cwd=SCRIPTS_DIR,
+            cwd=THESIS_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1
         )
-        
+
         output_lines = []
         if output_container:
             log_placeholder = output_container.empty()
-        
+
         for line in process.stdout:
             output_lines.append(line)
             if output_container:
                 log_placeholder.code(''.join(output_lines), language='text')
-        
+
         process.wait()
         full_output = ''.join(output_lines)
-        
+
         if process.returncode == 0:
-            return True, full_output
+            return True, full_output, visualization_dir
         else:
-            return False, full_output
-            
+            return False, full_output, visualization_dir
+
     except Exception as e:
-        return False, str(e)
+        return False, str(e), None
 
 # Main App
 def main():
@@ -1238,7 +1249,7 @@ def show_step5_convert_to_routing():
     from datetime import datetime
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_folder_name = f"{benchmark}_{component_type}_{placement_status}_{timestamp}"
-    output_folder = os.path.join(THESIS_DIR, ROUTING_RESULTS_DIR, output_folder_name)
+    output_folder = os.path.join(ROUTING_RESULTS_DIR, output_folder_name)
     
     st.write(f"**Output folder:** `{output_folder}`")
     
@@ -1437,9 +1448,10 @@ def show_step6_run_routing():
                 with st.spinner("Creating routing visualizations..."):
                     # Find the routing output file
                     routing_output_file = os.path.join(output_folder, "output")
-                    vis_success, vis_output = run_routing_visualization(routing_output_file, output_folder)
+                    vis_success, vis_output, vis_dir = run_routing_visualization(routing_output_file, output_folder)
+                    st.session_state.routing_visualize_dir = vis_dir
                     if vis_success:
-                        st.success("✅ Visualizations generated!")
+                        st.success(f"✅ Visualizations generated in `{vis_dir}`!")
                     else:
                         st.warning(f"Visualization generation had issues: {vis_output}")
             else:
@@ -1471,6 +1483,7 @@ def show_step7_view_routing_results():
     
     benchmark = st.session_state.selected_benchmark
     output_folder = st.session_state.get("routing_output_folder", "")
+    visualize_folder = st.session_state.get("routing_visualize_dir", "")
     
     if not output_folder or not os.path.exists(output_folder):
         st.error("Routing output folder not found.")
@@ -1488,6 +1501,7 @@ def show_step7_view_routing_results():
     **Component Type:** {component_type}
     **Placement Status:** {placement_status}
     **Output Folder:** {output_folder}
+    **Visualization Folder:** {visualize_folder or 'Not generated'}
     """)
     
     # Display routing metrics
@@ -1513,8 +1527,8 @@ def show_step7_view_routing_results():
     # Display routing layer images
     st.subheader("🗺️ Routing Layer Visualizations")
     
-    # Find all routing layer images
-    layer_images = sorted(glob.glob(os.path.join(output_folder, "routing_layer*.png")))
+    vis_root = visualize_folder if visualize_folder and os.path.exists(visualize_folder) else output_folder
+    layer_images = sorted(glob.glob(os.path.join(vis_root, "routing_layer*.png")))
     
     if layer_images:
         # Display in grid
@@ -1528,7 +1542,7 @@ def show_step7_view_routing_results():
     
     # Display congestion heatmap
     st.subheader("🌡️ Congestion Heatmap")
-    heatmap_path = os.path.join(output_folder, "congestion_heatmap.png")
+    heatmap_path = os.path.join(vis_root, "congestion_heatmap.png")
     
     if os.path.exists(heatmap_path):
         st.image(heatmap_path, caption="Congestion Heatmap", use_column_width=True)

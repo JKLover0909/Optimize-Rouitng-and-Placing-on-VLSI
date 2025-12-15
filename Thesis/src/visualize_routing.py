@@ -14,6 +14,10 @@ import numpy as np
 from collections import defaultdict
 
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_OUTPUT_DIR = BASE_DIR / "routing_visualize"
+
+
 def parse_routing_output(output_file):
     """
     Parse NTHU-Route output file (ISPD 2008 format)
@@ -377,8 +381,8 @@ Examples:
     parser.add_argument(
         '--output-dir',
         type=str,
-        default='.',
-        help='Output directory for visualization files (default: current directory)'
+        default=str(DEFAULT_OUTPUT_DIR),
+        help='Output directory for visualization files (default: Thesis/routing_visualize)'
     )
     
     parser.add_argument(
