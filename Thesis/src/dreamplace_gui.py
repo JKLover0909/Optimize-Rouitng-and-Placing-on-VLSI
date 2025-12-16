@@ -3,8 +3,7 @@
 DREAMPlace GUI - Streamlit Interface
 A complete workflow for IC placement optimization with PageRank and Routing
 """
-
-import streamlit as st
+import streamlit as st # type: ignore
 import subprocess
 import os
 import glob
@@ -12,8 +11,8 @@ from pathlib import Path
 import shutil
 from PIL import Image
 import re
-import matplotlib.pyplot as plt
-import pandas as pd
+import matplotlib.pyplot as plt # type: ignore
+import pandas as pd # type: ignore
 from datetime import datetime
 
 # Paths (absolute to the Thesis root)
@@ -196,7 +195,7 @@ def run_pagerank_script(benchmark, component_type, placement_status, ranking_alg
         if output_container:
             log_placeholder = output_container.empty()
         
-        for line in process.stdout:
+        for line in process.stdout: # type: ignore
             output_lines.append(line)
             if output_container:
                 log_placeholder.code(''.join(output_lines), language='text')
@@ -237,7 +236,7 @@ def run_dreamplace(benchmark, ranking_algorithm="pagerank", output_container=Non
         if output_container:
             log_placeholder = output_container.empty()
         
-        for line in process.stdout:
+        for line in process.stdout: # type: ignore
             output_lines.append(line)
             if output_container:
                 # Show last 100 lines to avoid overflow
@@ -515,7 +514,7 @@ def run_nthu_route(input_gr_file, output_dir, output_container=None, routing_con
         if output_container:
             log_placeholder = output_container.empty()
         
-        for line in process.stdout:
+        for line in process.stdout: # type: ignore
             output_lines.append(line)
             if output_container:
                 # Show last 50 lines
@@ -526,22 +525,22 @@ def run_nthu_route(input_gr_file, output_dir, output_container=None, routing_con
             if 'total wire length:' in line.lower():
                 match = re.search(r'total wire length:\s*(\d+)', line, re.IGNORECASE)
                 if match:
-                    metrics['wirelength'] = int(match.group(1))
+                    metrics['wirelength'] = int(match.group(1)) # type: ignore
             
             if 'max overflow=' in line.lower():
                 match = re.search(r'max overflow=\s*(\d+)', line, re.IGNORECASE)
                 if match:
-                    metrics['overflow'] = int(match.group(1))
+                    metrics['overflow'] = int(match.group(1)) # type: ignore
             
             if 'Total time:' in line:
                 match = re.search(r'Total time:\s*([\d.]+)\s*seconds', line)
                 if match:
-                    metrics['runtime'] = float(match.group(1))
+                    metrics['runtime'] = float(match.group(1)) # type: ignore
             
             if 'Routing completed in' in line:
                 match = re.search(r'Routing completed in\s*([\d.]+)\s*seconds', line)
                 if match:
-                    metrics['runtime'] = float(match.group(1))
+                    metrics['runtime'] = float(match.group(1)) # type: ignore
         
         process.wait()
         full_output = ''.join(output_lines)
@@ -589,7 +588,7 @@ def run_routing_visualization(routing_output_file, run_output_dir, output_contai
         if output_container:
             log_placeholder = output_container.empty()
 
-        for line in process.stdout:
+        for line in process.stdout: # type: ignore
             output_lines.append(line)
             if output_container:
                 log_placeholder.code(''.join(output_lines), language='text')
