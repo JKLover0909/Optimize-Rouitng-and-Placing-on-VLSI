@@ -712,9 +712,15 @@ def main():
         elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
             show_step4_ranking_dreamplace()
     elif st.session_state.step == 5:
-        show_step5_routing_conversion()
+        if st.session_state.selected_workflow == "Default":
+            show_step5_nthu_route()
+        elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
+            show_step5_routing_conversion()
     elif st.session_state.step == 6:
-        show_step6_nthu_route()
+        if st.session_state.selected_workflow == "Default":
+            show_step6_routing_visualization()
+        elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
+            show_step6_nthu_route()
     elif st.session_state.step == 7:
         show_step7_routing_visualization()
 
@@ -1952,15 +1958,9 @@ def show_dreamplace_results():
 
 def show_step4_routing_conversion():
     """Step 4: Routing Conversion for Default workflow"""
-    # This is the same as step5 but for Default workflow
-    show_step5_routing_conversion()
-
-
-def show_step5_routing_conversion():
-    """Step 5: Convert placement to routing format"""
-    st.markdown('<div class="step-header">Step 5: Convert to Routing Format</div>', unsafe_allow_html=True)
+    st.markdown('<div class="step-header">Step 4: Convert to Routing Format</div>', unsafe_allow_html=True)
     
-    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Workflow: <strong>Default</strong></div>', unsafe_allow_html=True)
     
     st.write("Convert DREAMPlace output to NthuRoute input format (.gr file).")
     
@@ -1970,18 +1970,17 @@ def show_step5_routing_conversion():
         st.write(f"**Output Directory:** `{st.session_state.routing_output_dir}`")
         
         # Next button
-        next_step = 5 if st.session_state.selected_workflow == "Default" else 6
         if st.button("➡️ Next: Run NthuRoute", type="primary"):
-            st.session_state.step = next_step
+            st.session_state.step = 5
             st.rerun()
         
         # Back button
         if st.button("⬅️ Back"):
-            st.session_state.step = st.session_state.step - 1
+            st.session_state.step = 3
             st.rerun()
     else:
         # Run conversion
-        if st.button("🔄 Run Conversion", type="primary", width='stretch'):
+        if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
             output_dir = get_routing_output_dir_name()
             output_container = st.empty()
             
@@ -2001,15 +2000,15 @@ def show_step5_routing_conversion():
         
         # Back button
         if st.button("⬅️ Back"):
-            st.session_state.step = st.session_state.step - 1
+            st.session_state.step = 3
             st.rerun()
 
 
-def show_step6_nthu_route():
-    """Step 6: Run NthuRoute global router"""
-    st.markdown('<div class="step-header">Step 6: Run NthuRoute</div>', unsafe_allow_html=True)
+def show_step5_nthu_route():
+    """Step 5: Run NthuRoute for Default workflow"""
+    st.markdown('<div class="step-header">Step 5: Run NthuRoute</div>', unsafe_allow_html=True)
     
-    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Input: <strong>{st.session_state.routing_output_dir}</strong></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Workflow: <strong>Default</strong><br>Input: <strong>{st.session_state.routing_output_dir}</strong></div>', unsafe_allow_html=True)
     
     st.write("Run NthuRoute global router to generate routing solution.")
     
@@ -2018,14 +2017,13 @@ def show_step6_nthu_route():
         st.markdown('<div class="success-box">✅ Routing completed!</div>', unsafe_allow_html=True)
         
         # Next button
-        next_step = 6 if st.session_state.selected_workflow == "Default" else 7
         if st.button("➡️ Next: Visualize Results", type="primary"):
-            st.session_state.step = next_step
+            st.session_state.step = 6
             st.rerun()
         
         # Back button
         if st.button("⬅️ Back"):
-            st.session_state.step = st.session_state.step - 1
+            st.session_state.step = 4
             st.rerun()
     else:
         # Find input .gr file
@@ -2037,10 +2035,13 @@ def show_step6_nthu_route():
         
         if not input_gr_file:
             st.error("❌ No .gr file found! Please run conversion first.")
+            if st.button("⬅️ Back to Conversion"):
+                st.session_state.step = 4
+                st.rerun()
             return
         
         # Run routing
-        if st.button("🚀 Run NthuRoute", type="primary", width='stretch'):
+        if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
             output_container = st.empty()
             
             success = run_nthu_route(
@@ -2059,12 +2060,311 @@ def show_step6_nthu_route():
         
         # Back button
         if st.button("⬅️ Back"):
-            st.session_state.step = st.session_state.step - 1
+            st.session_state.step = 4
+            st.rerun()
+
+
+def show_step6_routing_visualization():
+    """Step 6: Visualize routing results for Default workflow"""
+    st.markdown('<div class="step-header">Step 6: Visualize Routing</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Workflow: <strong>Default</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Generate visualization of the routing solution.")
+    
+    # Find output .out file
+    output_file = None
+    if st.session_state.routing_output_dir:
+        out_files = list(Path(st.session_state.routing_output_dir).glob("*.out"))
+        if out_files:
+            output_file = str(out_files[0])
+    
+    if not output_file:
+        st.error("❌ No routing output (.out) file found!")
+        if st.button("⬅️ Back to NthuRoute"):
+            st.session_state.step = 5
+            st.rerun()
+        return
+    
+    # Check if visualization exists
+    visualize_dir = st.session_state.routing_visualize_dir
+    if visualize_dir and os.path.exists(visualize_dir):
+        st.markdown('<div class="success-box">✅ Visualization completed!</div>', unsafe_allow_html=True)
+        
+        # Show visualization
+        show_routing_visualization_results(visualize_dir)
+        
+        # Finish button
+        if st.button("🎉 Finish Workflow", type="primary"):
+            st.balloons()
+            st.success("✅ Workflow completed successfully!")
+        
+        # Restart button
+        if st.button("🔄 Start New Workflow"):
+            reset_workflow()
+            st.rerun()
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 5
+            st.rerun()
+    else:
+        # Run visualization
+        if st.button("🎨 Generate Visualization", type="primary", use_container_width=True):
+            output_container = st.empty()
+            
+            success = run_routing_visualization(
+                output_file,
+                st.session_state.routing_output_dir,
+                output_container=output_container
+            )
+            
+            if success:
+                # Set visualize directory
+                benchmark = st.session_state.selected_benchmark
+                routing_dir_name = os.path.basename(st.session_state.routing_output_dir)
+                visualize_dir = os.path.join(ROUTING_VISUALIZE_DIR, routing_dir_name)
+                st.session_state.routing_visualize_dir = visualize_dir
+                
+                st.success("✅ Visualization completed!")
+                st.rerun()
+            else:
+                st.error("❌ Visualization failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 5
+            st.rerun()
+
+
+def show_step5_routing_conversion():
+    """Step 5: Convert placement to routing format (for Ranking workflow)"""
+    st.markdown('<div class="step-header">Step 5: Convert to Routing Format</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Workflow: <strong>Ranking + DREAMPlace</strong><br>Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Convert DREAMPlace output to NthuRoute input format (.gr file).")
+    
+    # Check if completed
+    if st.session_state.convert_completed:
+        st.markdown('<div class="success-box">✅ Conversion completed!</div>', unsafe_allow_html=True)
+        st.write(f"**Output Directory:** `{st.session_state.routing_output_dir}`")
+        
+        # Next button - Ranking workflow goes from step 5 → 6
+        if st.button("➡️ Next: Run NthuRoute", type="primary"):
+            st.session_state.step = 6
+            st.rerun()
+        
+        # Back button - Go back to step 4 (Ranking + DREAMPlace execution)
+        if st.button("⬅️ Back"):
+            st.session_state.step = 4
+            st.rerun()
+    else:
+        # Run conversion
+        if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
+            output_dir = get_routing_output_dir_name()
+            output_container = st.empty()
+            
+            success = run_placement_to_routing_converter(
+                st.session_state.selected_benchmark,
+                output_dir,
+                output_container=output_container
+            )
+            
+            if success:
+                st.session_state.routing_output_dir = output_dir
+                st.session_state.convert_completed = True
+                st.success("✅ Conversion completed!")
+                st.rerun()
+            else:
+                st.error("❌ Conversion failed! Check the logs above.")
+        
+        # Back button - Go back to step 4 (Ranking + DREAMPlace execution)
+        if st.button("⬅️ Back"):
+            st.session_state.step = 4
+            st.rerun()
+
+
+def show_step5_nthu_route():
+    """Step 5: Run NthuRoute global router (for Default workflow)"""
+    st.markdown('<div class="step-header">Step 5: Run NthuRoute</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Input: <strong>{st.session_state.routing_output_dir}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Run NthuRoute global router to generate routing solution.")
+    
+    # Check if completed
+    if st.session_state.routing_completed:
+        st.markdown('<div class="success-box">✅ Routing completed!</div>', unsafe_allow_html=True)
+        
+        # Next button
+        if st.button("➡️ Next: Visualize Results", type="primary"):
+            st.session_state.step = 6
+            st.rerun()
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 4
+            st.rerun()
+    else:
+        # Find input .gr file
+        input_gr_file = None
+        if st.session_state.routing_output_dir:
+            gr_files = list(Path(st.session_state.routing_output_dir).glob("*.gr"))
+            if gr_files:
+                input_gr_file = str(gr_files[0])
+        
+        if not input_gr_file:
+            st.error("❌ No .gr file found! Please run conversion first.")
+            return
+        
+        # Run routing
+        if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
+            output_container = st.empty()
+            
+            success = run_nthu_route(
+                input_gr_file,
+                st.session_state.routing_output_dir,
+                output_container=output_container,
+                routing_config=NTHU_PARAMS
+            )
+            
+            if success:
+                st.session_state.routing_completed = True
+                st.success("✅ Routing completed!")
+                st.rerun()
+            else:
+                st.error("❌ Routing failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 4
+            st.rerun()
+
+
+def show_step6_nthu_route():
+    """Step 6: Run NthuRoute global router (for Ranking workflow)"""
+    st.markdown('<div class="step-header">Step 6: Run NthuRoute</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Input: <strong>{st.session_state.routing_output_dir}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Run NthuRoute global router to generate routing solution.")
+    
+    # Check if completed
+    if st.session_state.routing_completed:
+        st.markdown('<div class="success-box">✅ Routing completed!</div>', unsafe_allow_html=True)
+        
+        # Next button
+        if st.button("➡️ Next: Visualize Results", type="primary"):
+            st.session_state.step = 7
+            st.rerun()
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 5
+            st.rerun()
+    else:
+        # Find input .gr file
+        input_gr_file = None
+        if st.session_state.routing_output_dir:
+            gr_files = list(Path(st.session_state.routing_output_dir).glob("*.gr"))
+            if gr_files:
+                input_gr_file = str(gr_files[0])
+        
+        if not input_gr_file:
+            st.error("❌ No .gr file found! Please run conversion first.")
+            return
+        
+        # Run routing
+        if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
+            output_container = st.empty()
+            
+            success = run_nthu_route(
+                input_gr_file,
+                st.session_state.routing_output_dir,
+                output_container=output_container,
+                routing_config=NTHU_PARAMS
+            )
+            
+            if success:
+                st.session_state.routing_completed = True
+                st.success("✅ Routing completed!")
+                st.rerun()
+            else:
+                st.error("❌ Routing failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 5
+            st.rerun()
+
+
+def show_step6_routing_visualization():
+    """Step 6: Visualize routing results (for Default workflow)"""
+    st.markdown('<div class="step-header">Step 6: Visualize Routing</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Generate visualization of the routing solution.")
+    
+    # Find output .out file
+    output_file = None
+    if st.session_state.routing_output_dir:
+        out_files = list(Path(st.session_state.routing_output_dir).glob("*.out"))
+        if out_files:
+            output_file = str(out_files[0])
+    
+    if not output_file:
+        st.error("❌ No routing output (.out) file found!")
+        return
+    
+    # Check if visualization exists
+    visualize_dir = st.session_state.routing_visualize_dir
+    if visualize_dir and os.path.exists(visualize_dir):
+        st.markdown('<div class="success-box">✅ Visualization completed!</div>', unsafe_allow_html=True)
+        
+        # Show visualization
+        show_routing_visualization_results(visualize_dir)
+        
+        # Finish button
+        if st.button("🎉 Finish Workflow", type="primary"):
+            st.balloons()
+            st.success("✅ Workflow completed successfully!")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 5
+            st.rerun()
+    else:
+        # Run visualization
+        if st.button("🎨 Generate Visualization", type="primary", use_container_width=True):
+            output_container = st.empty()
+            
+            success = run_routing_visualization(
+                output_file,
+                st.session_state.routing_output_dir,
+                output_container=output_container
+            )
+            
+            if success:
+                # Set visualize directory
+                benchmark = st.session_state.selected_benchmark
+                routing_dir_name = os.path.basename(st.session_state.routing_output_dir)
+                visualize_dir = f"routing_visualize/{routing_dir_name}"
+                st.session_state.routing_visualize_dir = visualize_dir
+                st.success("✅ Visualization completed!")
+                st.rerun()
+            else:
+                st.error("❌ Visualization failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 5
             st.rerun()
 
 
 def show_step7_routing_visualization():
-    """Step 7: Visualize routing results"""
+    """Step 7: Visualize routing results (for Ranking workflow)"""
     st.markdown('<div class="step-header">Step 7: Visualize Routing</div>', unsafe_allow_html=True)
     
     st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
@@ -2097,11 +2397,11 @@ def show_step7_routing_visualization():
         
         # Back button
         if st.button("⬅️ Back"):
-            st.session_state.step = st.session_state.step - 1
+            st.session_state.step = 6
             st.rerun()
     else:
         # Run visualization
-        if st.button("🎨 Generate Visualization", type="primary", width='stretch'):
+        if st.button("🎨 Generate Visualization", type="primary", use_container_width=True):
             output_container = st.empty()
             
             success = run_routing_visualization(
@@ -2124,7 +2424,7 @@ def show_step7_routing_visualization():
         
         # Back button
         if st.button("⬅️ Back"):
-            st.session_state.step = st.session_state.step - 1
+            st.session_state.step = 6
             st.rerun()
 
 
