@@ -102,6 +102,8 @@ if 'step' not in st.session_state:
     st.session_state.step = 1
 if 'selected_benchmark' not in st.session_state:
     st.session_state.selected_benchmark = None
+if 'selected_workflow' not in st.session_state:
+    st.session_state.selected_workflow = None
 if 'selected_pagerank' not in st.session_state:
     st.session_state.selected_pagerank = None
 if 'component_type' not in st.session_state:
@@ -371,6 +373,7 @@ def reset_workflow():
     """Reset the entire workflow to start over."""
     st.session_state.step = 1
     st.session_state.selected_benchmark = None
+    st.session_state.selected_workflow = None
     st.session_state.selected_pagerank = None
     st.session_state.component_type = None
     st.session_state.placement_status = None
@@ -607,66 +610,61 @@ def run_routing_visualization(routing_output_file, run_output_dir, output_contai
 # Main App
 def main():
     # Header
-    st.markdown('<div class="main-header">🔬 DREAMPlace + PageRank + Routing</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🔬 DREAMPlace Placement & Routing Optimizer</div>', unsafe_allow_html=True)
     
     # Sidebar for navigation
     with st.sidebar:
         st.header("📋 Workflow Progress")
         
-        # Progress indicators - Placement Phase
-        st.subheader("🔧 Placement Phase")
+        # Show workflow type if selected
+        if st.session_state.selected_workflow:
+            st.info(f"🎯 **Workflow:** {st.session_state.selected_workflow}")
+            st.markdown("---")
         
-        if st.session_state.step >= 1:
-            st.success("✅ Step 1: Benchmark Selection")
+        # Dynamic progress based on workflow
+        if st.session_state.selected_workflow == "Default":
+            # Default workflow steps
+            steps = [
+                (1, "Step 1: Select Benchmark"),
+                (2, "Step 2: Select Workflow"),
+                (3, "Step 3: Run DREAMPlace"),
+                (4, "Step 4: Convert to Routing"),
+                (5, "Step 5: Run NthuRoute"),
+                (6, "Step 6: Visualize Results")
+            ]
+        elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
+            # Ranking + DREAMPlace workflow steps
+            steps = [
+                (1, "Step 1: Select Benchmark"),
+                (2, "Step 2: Select Workflow"),
+                (3, "Step 3: Configure Ranking"),
+                (4, "Step 4: Run Ranking + DREAMPlace"),
+                (5, "Step 5: Convert to Routing"),
+                (6, "Step 6: Run NthuRoute"),
+                (7, "Step 7: Visualize Results")
+            ]
+        elif st.session_state.selected_workflow == "RankPlace":
+            # RankPlace workflow steps
+            steps = [
+                (1, "Step 1: Select Benchmark"),
+                (2, "Step 2: Select Workflow"),
+                (3, "Step 3: RankPlace (Coming Soon)")
+            ]
         else:
-            st.info("⏳ Step 1: Benchmark Selection")
+            # No workflow selected yet
+            steps = [
+                (1, "Step 1: Select Benchmark"),
+                (2, "Step 2: Select Workflow")
+            ]
         
-        if st.session_state.step >= 2:
-            st.success("✅ Step 2: Component Type")
-        else:
-            st.info("⏳ Step 2: Component Type")
-        
-        # Show step 2.3 if component type is not none
-        if st.session_state.component_type and st.session_state.component_type != "none":
-            if st.session_state.step >= 2.3:
-                st.success("✅ Step 2.3: Ranking Algorithm")
+        # Display progress
+        for step_num, step_name in steps:
+            if step_num < st.session_state.step:
+                st.success(f"✅ {step_name}")
+            elif step_num == st.session_state.step:
+                st.info(f"▶️ {step_name}")
             else:
-                st.info("⏳ Step 2.3: Ranking Algorithm")
-        
-        # Show step 2.5 only if macro or stdcell is selected
-        if st.session_state.component_type in ["macro", "stdcell"]:
-            if st.session_state.step >= 2.5:
-                st.success("✅ Step 2.5: Placement Status")
-            else:
-                st.info("⏳ Step 2.5: Placement Status")
-        
-        if st.session_state.step >= 3:
-            st.success("✅ Step 3: Run DREAMPlace")
-        else:
-            st.info("⏳ Step 3: Run DREAMPlace")
-        
-        if st.session_state.step >= 4:
-            st.success("✅ Step 4: Placement Results")
-        else:
-            st.info("⏳ Step 4: Placement Results")
-        
-        # Routing Phase
-        st.subheader("🛤️ Routing Phase")
-        
-        if st.session_state.step >= 5:
-            st.success("✅ Step 5: Convert to Routing")
-        else:
-            st.info("⏳ Step 5: Convert to Routing")
-        
-        if st.session_state.step >= 6:
-            st.success("✅ Step 6: Run NTHU-Route")
-        else:
-            st.info("⏳ Step 6: Run NTHU-Route")
-        
-        if st.session_state.routing_completed:
-            st.success("✅ Step 7: Routing Results")
-        else:
-            st.info("⏳ Step 7: Routing Results")
+                st.text(f"⭕ {step_name}")
         
         st.markdown("---")
         
@@ -674,13 +672,17 @@ def main():
         if st.session_state.selected_benchmark:
             st.write(f"**Benchmark:** {st.session_state.selected_benchmark}")
         
-        if st.session_state.component_type:
-            type_labels = {"global": "🌐 Global", "macro": "📦 Macro", "stdcell": "📱 Standard Cells"}
-            st.write(f"**Type:** {type_labels.get(st.session_state.component_type, st.session_state.component_type)}")
-        
-        if st.session_state.placement_status:
-            status_labels = {"movable": "🔄 Movable", "fixed": "📌 Fixed"}
-            st.write(f"**Status:** {status_labels.get(st.session_state.placement_status, st.session_state.placement_status)}")
+        if st.session_state.selected_workflow == "Ranking + DREAMPlace":
+            if st.session_state.component_type:
+                type_labels = {"global": "🌐 All", "macro": "📦 Macro", "stdcell": "📱 Std Cells"}
+                st.write(f"**Component:** {type_labels.get(st.session_state.component_type, st.session_state.component_type)}")
+            
+            if st.session_state.placement_status:
+                status_labels = {"movable": "🔄 Movable", "fixed": "📌 Fixed"}
+                st.write(f"**Status:** {status_labels.get(st.session_state.placement_status, st.session_state.placement_status)}")
+            
+            if st.session_state.ranking_algorithm:
+                st.write(f"**Algorithm:** {st.session_state.ranking_algorithm.title()}")
         
         if st.session_state.routing_output_dir:
             st.write(f"**Output:** {os.path.basename(st.session_state.routing_output_dir)}")
@@ -692,25 +694,29 @@ def main():
             reset_workflow()
             st.rerun()
     
-    # Main content
+    # Main content routing based on step and workflow
     if st.session_state.step == 1:
         show_step1_benchmark_selection()
     elif st.session_state.step == 2:
-        show_step2_component_type()
-    elif st.session_state.step == 2.3:
-        show_step2_3_ranking_algorithm()
-    elif st.session_state.step == 2.5:
-        show_step2_5_placement_status()
+        show_step2_workflow_selection()
     elif st.session_state.step == 3:
-        show_step3_run_dreamplace()
+        if st.session_state.selected_workflow == "Default":
+            show_step3_default_dreamplace()
+        elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
+            show_step3_ranking_config()
+        elif st.session_state.selected_workflow == "RankPlace":
+            show_step3_rankplace_coming_soon()
     elif st.session_state.step == 4:
-        show_step4_view_results()
+        if st.session_state.selected_workflow == "Default":
+            show_step4_routing_conversion()
+        elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
+            show_step4_ranking_dreamplace()
     elif st.session_state.step == 5:
-        show_step5_convert_to_routing()
+        show_step5_routing_conversion()
     elif st.session_state.step == 6:
-        show_step6_run_routing()
+        show_step6_nthu_route()
     elif st.session_state.step == 7:
-        show_step7_view_routing_results()
+        show_step7_routing_visualization()
 
 def show_step1_benchmark_selection():
     """Step 1: Select benchmark from ISPD2005."""
@@ -738,7 +744,7 @@ def show_step1_benchmark_selection():
             if st.button(
                 benchmark,
                 key=f"bench_{benchmark}",
-                use_container_width=True,
+                width='stretch',
                 type="primary" if st.session_state.selected_benchmark == benchmark else "secondary"
             ):
                 st.session_state.selected_benchmark = benchmark
@@ -764,7 +770,7 @@ def show_step1_benchmark_selection():
                         break
         
         # Next button
-        if st.button("➡️ Next: Select Component Type", type="primary"):
+        if st.button("➡️ Next: Select Workflow", type="primary"):
             st.session_state.step = 2
             st.rerun()
 
@@ -818,7 +824,7 @@ def show_step2_3_ranking_algorithm():
                 if st.button(
                     "Select",
                     key=f"algo_{algo_id}",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary" if st.session_state.ranking_algorithm == algo_id else "secondary"
                 ):
                     st.session_state.ranking_algorithm = algo_id
@@ -897,7 +903,7 @@ def show_step2_component_type():
                 if st.button(
                     "Select",
                     key=f"comp_{comp_type}",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary" if st.session_state.component_type == comp_type else "secondary"
                 ):
                     st.session_state.component_type = comp_type
@@ -979,7 +985,7 @@ def show_step2_5_placement_status():
                 if st.button(
                     "Select",
                     key=f"status_{status}",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary" if st.session_state.placement_status == status else "secondary"
                 ):
                     st.session_state.placement_status = status
@@ -1215,17 +1221,17 @@ def show_step4_view_results():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("🔄 Start New Optimization", type="primary", use_container_width=True):
+        if st.button("🔄 Start New Optimization", type="primary", width='stretch'):
             reset_workflow()
             st.rerun()
     
     with col2:
-        if st.button("📥 Download Results", type="secondary", use_container_width=True):
+        if st.button("📥 Download Results", type="secondary", width='stretch'):
             st.info("Results are saved in the DREAMPlace results directory")
             st.code(f"{RESULTS_DIR}/{st.session_state.selected_benchmark}")
     
     with col3:
-        if st.button("➡️ Continue to Routing", type="secondary", use_container_width=True):
+        if st.button("➡️ Continue to Routing", type="secondary", width='stretch'):
             st.session_state.step = 5
             st.rerun()
 
@@ -1275,7 +1281,7 @@ def show_step5_convert_to_routing():
     
     st.success(f"Found placement file: `{pl_file}`")
     
-    if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
+    if st.button("🔄 Run Conversion", type="primary", width='stretch'):
         progress_container = st.empty()
         
         with st.spinner("Converting placement to routing format..."):
@@ -1306,13 +1312,13 @@ def show_step5_convert_to_routing():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("⬅️ Back to Results", use_container_width=True):
+        if st.button("⬅️ Back to Results", width='stretch'):
             st.session_state.step = 4
             st.rerun()
     
     with col2:
         if st.session_state.get("convert_completed", False):
-            if st.button("➡️ Run Routing", type="primary", use_container_width=True):
+            if st.button("➡️ Run Routing", type="primary", width='stretch'):
                 st.session_state.step = 6
                 st.rerun()
 
@@ -1410,7 +1416,7 @@ def show_step6_run_routing():
 --p3-box-expand-size={NTHU_PARAMS['p3_box_expand_size']}
 --monotonic-routing={NTHU_PARAMS['monotonic_routing']}""", language="text")
 
-    if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
+    if st.button("🚀 Run NthuRoute", type="primary", width='stretch'):
         progress_placeholder = st.empty()
         log_placeholder = st.empty()
         
@@ -1465,13 +1471,13 @@ def show_step6_run_routing():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("⬅️ Back to Conversion", use_container_width=True):
+        if st.button("⬅️ Back to Conversion", width='stretch'):
             st.session_state.step = 5
             st.rerun()
     
     with col2:
         if st.session_state.get("routing_completed", False):
-            if st.button("➡️ View Routing Results", type="primary", use_container_width=True):
+            if st.button("➡️ View Routing Results", type="primary", width='stretch'):
                 st.session_state.step = 7
                 st.rerun()
 
@@ -1565,14 +1571,609 @@ def show_step7_view_routing_results():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🔄 Start New Optimization", type="primary", use_container_width=True):
+        if st.button("🔄 Start New Optimization", type="primary", width='stretch'):
             reset_workflow()
             st.rerun()
     
     with col2:
-        if st.button("⬅️ Back to Routing", use_container_width=True):
+        if st.button("⬅️ Back to Routing", width='stretch'):
             st.session_state.step = 6
             st.rerun()
+
+
+# ==================== NEW WORKFLOW FUNCTIONS ====================
+
+def show_step2_workflow_selection():
+    """Step 2: Select Workflow Type"""
+    st.markdown('<div class="step-header">Step 2: Select Workflow</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Choose a workflow for placement optimization:")
+    
+    # Workflow options
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        ### 🎯 Default
+        **Direct DREAMPlace**
+        - No preprocessing
+        - Standard placement
+        - Fastest workflow
+        """)
+        if st.button("Select Default", key="workflow_default", width='stretch', type="primary"):
+            st.session_state.selected_workflow = "Default"
+            st.session_state.step = 3
+            st.rerun()
+    
+    with col2:
+        st.markdown("""
+        ### 📊 Ranking + DREAMPlace
+        **Centrality-based Optimization**
+        - Component ranking
+        - PageRank/Eigenvector/Degree
+        - Enhanced placement
+        """)
+        if st.button("Select Ranking + DREAMPlace", key="workflow_ranking", width='stretch', type="primary"):
+            st.session_state.selected_workflow = "Ranking + DREAMPlace"
+            st.session_state.step = 3
+            st.rerun()
+    
+    with col3:
+        st.markdown("""
+        ### 🚀 RankPlace
+        **MaskPlace with Centrality**
+        - RL-based macro placement
+        - Centrality ordering
+        - Coming Soon...
+        """)
+        if st.button("Select RankPlace (Coming Soon)", key="workflow_rankplace", width='stretch', disabled=True):
+            st.session_state.selected_workflow = "RankPlace"
+            st.session_state.step = 3
+            st.rerun()
+    
+    # Back button
+    st.markdown("---")
+    if st.button("⬅️ Back to Benchmark Selection"):
+        st.session_state.step = 1
+        st.rerun()
+
+
+def show_step3_default_dreamplace():
+    """Step 3: Default - Run DREAMPlace directly"""
+    st.markdown('<div class="step-header">Step 3: Run DREAMPlace (Default)</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Workflow: <strong>Default</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Run DREAMPlace with default configuration (no preprocessing).")
+    
+    # Check if already completed
+    if st.session_state.dreamplace_completed:
+        st.markdown('<div class="success-box">✅ DREAMPlace completed successfully!</div>', unsafe_allow_html=True)
+        
+        # Show results
+        show_dreamplace_results()
+        
+        # Next button
+        if st.button("➡️ Next: Routing Conversion", type="primary"):
+            st.session_state.step = 4
+            st.rerun()
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 2
+            st.rerun()
+    else:
+        # Run button
+        if st.button("🚀 Run DREAMPlace", type="primary", width='stretch'):
+            with st.spinner("Running DREAMPlace..."):
+                # Restore original .pl file to ensure clean state
+                restore_original_pl(st.session_state.selected_benchmark)
+                
+                output_container = st.empty()
+                success = run_dreamplace(
+                    st.session_state.selected_benchmark,
+                    ranking_algorithm=None,  # No ranking for default
+                    output_container=output_container
+                )
+                
+                if success:
+                    st.session_state.dreamplace_completed = True
+                    st.success("✅ DREAMPlace completed successfully!")
+                    st.rerun()
+                else:
+                    st.error("❌ DREAMPlace failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back to Workflow Selection"):
+            st.session_state.step = 2
+            st.rerun()
+
+
+def show_step3_ranking_config():
+    """Step 3: Ranking + DREAMPlace - Configure all options in one page"""
+    st.markdown('<div class="step-header">Step 3: Configure Ranking Parameters</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Workflow: <strong>Ranking + DREAMPlace</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Configure ranking parameters before running the workflow:")
+    
+    # All options in one page
+    st.markdown("### 1️⃣ Component Type")
+    component_type = st.radio(
+        "Select which components to rank:",
+        options=["global", "macro", "stdcell"],
+        format_func=lambda x: {
+            "global": "🌍 All Components (Macro + Standard Cells)",
+            "macro": "📦 Macro Only",
+            "stdcell": "⚡ Standard Cells Only"
+        }[x],
+        key="comp_type_radio",
+        horizontal=True
+    )
+    
+    # Show placement status if macro or stdcell selected
+    placement_status = None
+    if component_type in ["macro", "stdcell"]:
+        st.markdown("### 2️⃣ Placement Status")
+        placement_status = st.radio(
+            f"How should {component_type}s be placed?",
+            options=["movable", "fixed"],
+            format_func=lambda x: {
+                "movable": "🔄 Movable (can be moved during placement)",
+                "fixed": "📌 Fixed (position locked)"
+            }[x],
+            key="placement_status_radio",
+            horizontal=True
+        )
+    
+    # Ranking algorithm
+    st.markdown("### 3️⃣ Ranking Algorithm")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        **🔗 PageRank**
+        - Graph-based ranking
+        - High-quality connections
+        - ✅ Recommended
+        - 7.64% better than Eigenvector
+        """)
+        pagerank_btn = st.button("Select PageRank", key="algo_pagerank", width='stretch', type="primary")
+    
+    with col2:
+        st.markdown("""
+        **📊 Eigenvector Centrality**
+        - Node importance
+        - Connected node values
+        - Baseline algorithm
+        """)
+        eigenvector_btn = st.button("Select Eigenvector", key="algo_eigenvector", width='stretch')
+    
+    with col3:
+        st.markdown("""
+        **📈 Degree Centrality**
+        - Connection count
+        - Simple ranking
+        - Fast computation
+        """)
+        degree_btn = st.button("Select Degree", key="algo_degree", width='stretch')
+    
+    # Handle algorithm selection
+    if pagerank_btn:
+        ranking_algorithm = "pagerank"
+    elif eigenvector_btn:
+        ranking_algorithm = "eigenvector"
+    elif degree_btn:
+        ranking_algorithm = "degree"
+    else:
+        ranking_algorithm = st.session_state.ranking_algorithm  # Keep current
+    
+    # Show current selection
+    st.markdown("---")
+    st.markdown("### 📋 Current Configuration:")
+    st.write(f"**Component Type:** {component_type}")
+    if placement_status:
+        st.write(f"**Placement Status:** {placement_status}")
+    st.write(f"**Ranking Algorithm:** {ranking_algorithm}")
+    
+    # Run button
+    st.markdown("---")
+    if st.button("🚀 Run Ranking + DREAMPlace", type="primary", width='stretch'):
+        # Save selections
+        st.session_state.component_type = component_type
+        st.session_state.placement_status = placement_status
+        st.session_state.ranking_algorithm = ranking_algorithm
+        st.session_state.step = 4
+        st.rerun()
+    
+    # Back button
+    if st.button("⬅️ Back to Workflow Selection"):
+        st.session_state.step = 2
+        st.rerun()
+
+
+def show_step4_ranking_dreamplace():
+    """Step 4: Run Ranking + DREAMPlace workflow"""
+    st.markdown('<div class="step-header">Step 4: Run Ranking + DREAMPlace</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Component: <strong>{st.session_state.component_type}</strong><br>Placement: <strong>{st.session_state.placement_status or "N/A"}</strong><br>Algorithm: <strong>{st.session_state.ranking_algorithm}</strong></div>', unsafe_allow_html=True)
+    
+    # Check if completed
+    if st.session_state.pagerank_completed and st.session_state.dreamplace_completed:
+        st.markdown('<div class="success-box">✅ Ranking + DREAMPlace completed successfully!</div>', unsafe_allow_html=True)
+        
+        # Show results
+        show_dreamplace_results()
+        
+        # Next button
+        if st.button("➡️ Next: Routing Conversion", type="primary"):
+            st.session_state.step = 5
+            st.rerun()
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = 3
+            st.rerun()
+    else:
+        # Run workflow
+        if st.button("🚀 Start Workflow", type="primary", width='stretch'):
+            # Step 1: Run PageRank
+            st.markdown("### Step 1: Running PageRank/Centrality Ranking...")
+            output_container1 = st.empty()
+            
+            success_pr = run_pagerank_script(
+                st.session_state.selected_benchmark,
+                st.session_state.component_type,
+                st.session_state.placement_status,
+                st.session_state.ranking_algorithm,
+                output_container=output_container1
+            )
+            
+            if not success_pr:
+                st.error("❌ PageRank failed! Check the logs above.")
+                return
+            
+            st.session_state.pagerank_completed = True
+            st.success("✅ PageRank completed!")
+            
+            # Step 2: Run DREAMPlace
+            st.markdown("### Step 2: Running DREAMPlace...")
+            output_container2 = st.empty()
+            
+            success_dp = run_dreamplace(
+                st.session_state.selected_benchmark,
+                ranking_algorithm=st.session_state.ranking_algorithm,
+                output_container=output_container2
+            )
+            
+            if success_dp:
+                st.session_state.dreamplace_completed = True
+                st.success("✅ DREAMPlace completed successfully!")
+                st.rerun()
+            else:
+                st.error("❌ DREAMPlace failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back to Configuration"):
+            st.session_state.step = 3
+            st.rerun()
+
+
+def show_step3_rankplace_coming_soon():
+    """Step 3: RankPlace - Coming Soon"""
+    st.markdown('<div class="step-header">Step 3: RankPlace (Coming Soon)</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Workflow: <strong>RankPlace</strong></div>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="warning-box">
+    <h3>🚧 Under Development</h3>
+    <p>RankPlace workflow integrates MaskPlace (RL-based macro placement) with centrality ordering.</p>
+    <p><strong>Features:</strong></p>
+    <ul>
+        <li>Parse macro components from benchmark</li>
+        <li>Compute centrality (PageRank/Eigenvector/Degree)</li>
+        <li>Run MaskPlace with centrality ordering</li>
+        <li>Generate .pl file with placed macros</li>
+        <li>Run DREAMPlace for standard cell placement</li>
+    </ul>
+    <p>This feature will be available in the next update.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Back button
+    if st.button("⬅️ Back to Workflow Selection"):
+        st.session_state.step = 2
+        st.rerun()
+
+
+def show_dreamplace_results():
+    """Helper function to show DREAMPlace results"""
+    st.markdown("### 📊 Placement Results")
+    
+    benchmark = st.session_state.selected_benchmark
+    
+    # Show log metrics if available
+    log_path = f"{RESULTS_DIR}/{benchmark}/{benchmark}.log"
+    if os.path.exists(log_path):
+        metrics = parse_dreamplace_log(log_path)
+        if metrics:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Final HPWL", metrics.get("final_hpwl", "N/A"))
+            with col2:
+                st.metric("Density Overflow", metrics.get("final_overflow", "N/A"))
+            with col3:
+                st.metric("Runtime", metrics.get("total_runtime", "N/A"))
+            with col4:
+                st.metric("Iterations", metrics.get("total_iterations", "N/A"))
+    
+    # Show latest visualization
+    plot_file = get_latest_plot_image(benchmark)
+    if plot_file:
+        st.markdown("### 🖼️ Final Placement Visualization")
+        try:
+            rotated_img = rotate_image_180(plot_file)
+            st.image(rotated_img, caption=f"Final placement: {os.path.basename(plot_file)}", width='stretch')
+            st.info(f"📁 Full path: `{plot_file}`")
+        except Exception as e:
+            st.warning(f"Could not load image: {e}")
+        
+        # Show all iteration plots
+        results_path = f"{RESULTS_DIR}/{benchmark}"
+        plot_dir = f"{results_path}/plot"
+        if os.path.exists(plot_dir):
+            import glob
+            png_files = sorted(glob.glob(f"{plot_dir}/iter*.png"))
+            
+            if png_files:
+                st.write(f"**Total iterations:** {len(png_files)}")
+                
+                with st.expander(f"📸 View all {len(png_files)} iteration plots"):
+                    # Show in grid
+                    cols_per_row = 4
+                    for i in range(0, len(png_files), cols_per_row):
+                        cols = st.columns(cols_per_row)
+                        for j, col in enumerate(cols):
+                            idx = i + j
+                            if idx < len(png_files):
+                                with col:
+                                    try:
+                                        rotated_img = rotate_image_180(png_files[idx])
+                                        st.image(rotated_img, caption=os.path.basename(png_files[idx]), width='stretch')
+                                    except Exception as e:
+                                        st.error(f"Error loading {os.path.basename(png_files[idx])}")
+    else:
+        st.warning("⚠️ No visualization found. The plot directory may be empty.")
+
+
+def show_step4_routing_conversion():
+    """Step 4: Routing Conversion for Default workflow"""
+    # This is the same as step5 but for Default workflow
+    show_step5_routing_conversion()
+
+
+def show_step5_routing_conversion():
+    """Step 5: Convert placement to routing format"""
+    st.markdown('<div class="step-header">Step 5: Convert to Routing Format</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Convert DREAMPlace output to NthuRoute input format (.gr file).")
+    
+    # Check if completed
+    if st.session_state.convert_completed:
+        st.markdown('<div class="success-box">✅ Conversion completed!</div>', unsafe_allow_html=True)
+        st.write(f"**Output Directory:** `{st.session_state.routing_output_dir}`")
+        
+        # Next button
+        next_step = 5 if st.session_state.selected_workflow == "Default" else 6
+        if st.button("➡️ Next: Run NthuRoute", type="primary"):
+            st.session_state.step = next_step
+            st.rerun()
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = st.session_state.step - 1
+            st.rerun()
+    else:
+        # Run conversion
+        if st.button("🔄 Run Conversion", type="primary", width='stretch'):
+            output_dir = get_routing_output_dir_name()
+            output_container = st.empty()
+            
+            success = run_placement_to_routing_converter(
+                st.session_state.selected_benchmark,
+                output_dir,
+                output_container=output_container
+            )
+            
+            if success:
+                st.session_state.routing_output_dir = output_dir
+                st.session_state.convert_completed = True
+                st.success("✅ Conversion completed!")
+                st.rerun()
+            else:
+                st.error("❌ Conversion failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = st.session_state.step - 1
+            st.rerun()
+
+
+def show_step6_nthu_route():
+    """Step 6: Run NthuRoute global router"""
+    st.markdown('<div class="step-header">Step 6: Run NthuRoute</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Input: <strong>{st.session_state.routing_output_dir}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Run NthuRoute global router to generate routing solution.")
+    
+    # Check if completed
+    if st.session_state.routing_completed:
+        st.markdown('<div class="success-box">✅ Routing completed!</div>', unsafe_allow_html=True)
+        
+        # Next button
+        next_step = 6 if st.session_state.selected_workflow == "Default" else 7
+        if st.button("➡️ Next: Visualize Results", type="primary"):
+            st.session_state.step = next_step
+            st.rerun()
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = st.session_state.step - 1
+            st.rerun()
+    else:
+        # Find input .gr file
+        input_gr_file = None
+        if st.session_state.routing_output_dir:
+            gr_files = list(Path(st.session_state.routing_output_dir).glob("*.gr"))
+            if gr_files:
+                input_gr_file = str(gr_files[0])
+        
+        if not input_gr_file:
+            st.error("❌ No .gr file found! Please run conversion first.")
+            return
+        
+        # Run routing
+        if st.button("🚀 Run NthuRoute", type="primary", width='stretch'):
+            output_container = st.empty()
+            
+            success = run_nthu_route(
+                input_gr_file,
+                st.session_state.routing_output_dir,
+                output_container=output_container,
+                routing_config=NTHU_PARAMS
+            )
+            
+            if success:
+                st.session_state.routing_completed = True
+                st.success("✅ Routing completed!")
+                st.rerun()
+            else:
+                st.error("❌ Routing failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = st.session_state.step - 1
+            st.rerun()
+
+
+def show_step7_routing_visualization():
+    """Step 7: Visualize routing results"""
+    st.markdown('<div class="step-header">Step 7: Visualize Routing</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Generate visualization of the routing solution.")
+    
+    # Find output .out file
+    output_file = None
+    if st.session_state.routing_output_dir:
+        out_files = list(Path(st.session_state.routing_output_dir).glob("*.out"))
+        if out_files:
+            output_file = str(out_files[0])
+    
+    if not output_file:
+        st.error("❌ No routing output (.out) file found!")
+        return
+    
+    # Check if visualization exists
+    visualize_dir = st.session_state.routing_visualize_dir
+    if visualize_dir and os.path.exists(visualize_dir):
+        st.markdown('<div class="success-box">✅ Visualization completed!</div>', unsafe_allow_html=True)
+        
+        # Show visualization
+        show_routing_visualization_results(visualize_dir)
+        
+        # Finish button
+        if st.button("🎉 Finish Workflow", type="primary"):
+            st.balloons()
+            st.success("✅ Workflow completed successfully!")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = st.session_state.step - 1
+            st.rerun()
+    else:
+        # Run visualization
+        if st.button("🎨 Generate Visualization", type="primary", width='stretch'):
+            output_container = st.empty()
+            
+            success = run_routing_visualization(
+                output_file,
+                st.session_state.routing_output_dir,
+                output_container=output_container
+            )
+            
+            if success:
+                # Set visualize directory
+                benchmark = st.session_state.selected_benchmark
+                routing_dir_name = os.path.basename(st.session_state.routing_output_dir)
+                visualize_dir = os.path.join(ROUTING_VISUALIZE_DIR, routing_dir_name)
+                st.session_state.routing_visualize_dir = visualize_dir
+                
+                st.success("✅ Visualization completed!")
+                st.rerun()
+            else:
+                st.error("❌ Visualization failed! Check the logs above.")
+        
+        # Back button
+        if st.button("⬅️ Back"):
+            st.session_state.step = st.session_state.step - 1
+            st.rerun()
+
+
+def show_routing_visualization_results(visualize_dir):
+    """Show routing visualization images"""
+    st.markdown("### 🖼️ Routing Visualization")
+    
+    # Find PNG files
+    png_files = list(Path(visualize_dir).glob("*.png"))
+    
+    if not png_files:
+        st.warning("No visualization images found.")
+        return
+    
+    # Show images in tabs by layer
+    layers = {}
+    for png_file in png_files:
+        filename = png_file.name
+        if "layer" in filename.lower():
+            # Extract layer number
+            import re
+            match = re.search(r'layer[_-]?(\d+)', filename, re.IGNORECASE)
+            if match:
+                layer_num = int(match.group(1))
+                layers[layer_num] = str(png_file)
+    
+    if layers:
+        # Sort by layer number
+        sorted_layers = sorted(layers.items())
+        
+        # Create tabs for each layer
+        tab_names = [f"Layer {layer}" for layer, _ in sorted_layers]
+        tabs = st.tabs(tab_names)
+        
+        for tab, (layer, img_path) in zip(tabs, sorted_layers):
+            with tab:
+                try:
+                    img = Image.open(img_path)
+                    st.image(img, caption=f"Routing Layer {layer}", width='stretch')
+                except Exception as e:
+                    st.error(f"Could not load image: {e}")
+    else:
+        # Show all images if layer structure not found
+        for png_file in png_files:
+            try:
+                img = Image.open(png_file)
+                st.image(img, caption=png_file.name, width='stretch')
+            except Exception as e:
+                st.error(f"Could not load {png_file.name}: {e}")
 
 
 if __name__ == "__main__":
