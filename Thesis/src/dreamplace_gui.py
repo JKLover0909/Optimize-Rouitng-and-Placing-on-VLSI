@@ -398,6 +398,9 @@ def get_routing_output_dir_name():
 def run_placement_to_routing_converter(benchmark, output_dir, output_container=None):
     """Convert placement result to routing input (.gr file)."""
     
+    # Create output directory if not exists
+    os.makedirs(output_dir, exist_ok=True)
+    
     # Import the converter
     from Placement_to_routing_converter import RoutingBenchmarkGenerator
     
@@ -468,17 +471,9 @@ def run_nthu_route(input_gr_file, output_dir, output_container=None, routing_con
         return False, f"FLUTE data files (POWV9.dat, POST9.dat) not found in {nthu_route_cwd}", {}
     
     # Use routing_config if provided, otherwise use default NTHU_PARAMS
+    # If routing_config is already in the correct format (like NTHU_PARAMS), use it directly
     if routing_config:
-        params = {
-            'p2_max_iteration': routing_config['p2_max_iter'],
-            'p2_init_box_size': routing_config['p2_init_box'],
-            'p2_box_expand_size': 1,
-            'overflow_threshold': routing_config['overflow_threshold'],
-            'p3_max_iteration': routing_config['p3_max_iter'],
-            'p3_init_box_size': routing_config['p3_init_box'],
-            'p3_box_expand_size': routing_config['p3_box_expand'],
-            'monotonic_routing': 0
-        }
+        params = routing_config
     else:
         params = NTHU_PARAMS
     
@@ -1981,7 +1976,8 @@ def show_step4_routing_conversion():
     else:
         # Run conversion
         if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
-            output_dir = get_routing_output_dir_name()
+            output_dir_name = get_routing_output_dir_name()
+            output_dir = os.path.join(ROUTING_RESULTS_DIR, output_dir_name)
             output_container = st.empty()
             
             success = run_placement_to_routing_converter(
@@ -2162,7 +2158,8 @@ def show_step5_routing_conversion():
     else:
         # Run conversion
         if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
-            output_dir = get_routing_output_dir_name()
+            output_dir_name = get_routing_output_dir_name()
+            output_dir = os.path.join(ROUTING_RESULTS_DIR, output_dir_name)
             output_container = st.empty()
             
             success = run_placement_to_routing_converter(
