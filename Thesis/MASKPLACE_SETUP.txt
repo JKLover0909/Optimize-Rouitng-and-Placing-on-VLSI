@@ -1,3 +1,7 @@
+docker stop $(docker ps -q --filter "name=maskplace_train")
+docker rm $(docker ps -aq --filter "name=maskplace_train")
+bash train_parallel_4.sh
+
 #!/bin/bash
 # Complete Setup Guide for VLSI Placement Research Project
 # This script provides step-by-step instructions for setting up all containers

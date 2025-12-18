@@ -1675,7 +1675,7 @@ def show_step3_default_dreamplace():
                 output_container = st.empty()
                 success = run_dreamplace(
                     st.session_state.selected_benchmark,
-                    ranking_algorithm=None,  # No ranking for default
+                    ranking_algorithm=None,  # No ranking for default # type: ignore
                     output_container=output_container
                 )
                 
@@ -2000,7 +2000,7 @@ def show_step4_routing_conversion():
             st.rerun()
 
 
-def show_step5_nthu_route():
+def show_step5_nthu_route(): # type: ignore
     """Step 5: Run NthuRoute for Default workflow"""
     st.markdown('<div class="step-header">Step 5: Run NthuRoute</div>', unsafe_allow_html=True)
     
@@ -2060,7 +2060,7 @@ def show_step5_nthu_route():
             st.rerun()
 
 
-def show_step6_routing_visualization():
+def show_step6_routing_visualization(): # type: ignore
     """Step 6: Visualize routing results for Default workflow"""
     st.markdown('<div class="step-header">Step 6: Visualize Routing</div>', unsafe_allow_html=True)
     
