@@ -41,7 +41,7 @@ def parse_nodes_file(nodes_path):
     return nodes
 
 
-def identify_macros(nodes, area_threshold=1000):
+def identify_macros(nodes, area_threshold=10000):
     """
     Identify macro blocks based on area threshold
     Returns: set of macro names
@@ -193,8 +193,8 @@ def main():
     parser.add_argument(
         '--threshold',
         type=float,
-        default=1000,
-        help='Area threshold for identifying macros (default: 1000)'
+        default=10000,
+        help='Area threshold for identifying macros (default: 10000)'
     )
     parser.add_argument(
         '--damping',

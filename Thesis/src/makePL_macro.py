@@ -7,7 +7,7 @@ Standard cells remain at the bottom in original order.
 
 import sys
 import os
-import networkx as nx
+import networkx as nx # type: ignore
 from collections import defaultdict
 
 def parse_nodes_file(nodes_file):
@@ -37,7 +37,7 @@ def parse_nodes_file(nodes_file):
     
     return components
 
-def identify_macros(components, area_threshold=1000):
+def identify_macros(components, area_threshold=10000):
     """Identify macro components based on area threshold."""
     macros = set()
     for name, info in components.items():
@@ -249,7 +249,7 @@ def main():
     # Step 1: Parse nodes to identify macros
     print("Step 1: Parsing .nodes file...")
     components = parse_nodes_file(nodes_file)
-    macros = identify_macros(components, area_threshold)
+    macros = identify_macros(components, area_threshold) # type: ignore
     print(f"  Total components: {len(components)}")
     print(f"  Identified macros: {len(macros)}")
     print()

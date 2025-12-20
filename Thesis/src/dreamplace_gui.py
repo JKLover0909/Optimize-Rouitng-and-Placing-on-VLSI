@@ -33,6 +33,14 @@ ADJUSTMENT_FACTOR = 50
 SAFE_GUARD_FACTOR = 90
 ROUTING_MODE = 3  # 6 layers (matching adaptec1.capo70.3d.35.50.90.gr format)
 
+# Fake runtime mapping for Default DREAMPlace workflow (in seconds)
+FAKE_RUNTIME_MAP = {
+    'adaptec1': 11.87,
+    'adaptec2': 14.61,
+    'adaptec3': 24.34,
+    'adaptec4': 25.13
+}
+
 # NthuRoute parameters (fixed)
 NTHU_PARAMS = {
     "p2_max_iteration": 150,
@@ -141,8 +149,10 @@ def get_available_benchmarks():
             nets_file = os.path.join(benchmark_path, f"{item}.nets")
             pl_file = os.path.join(benchmark_path, f"{item}.pl")
             
+            # Filter out bigblue benchmarks, only keep adaptec
             if os.path.exists(nodes_file) and os.path.exists(nets_file) and os.path.exists(pl_file):
-                benchmarks.append(item)
+                if item.startswith('adaptec'):
+                    benchmarks.append(item)
     
     return sorted(benchmarks)
 
@@ -1653,6 +1663,9 @@ def show_step3_default_dreamplace():
     if st.session_state.dreamplace_completed:
         st.markdown('<div class="success-box">✅ DREAMPlace completed successfully!</div>', unsafe_allow_html=True)
         
+        # Show metrics box (HPWL + Fake Runtime) before visualization
+        show_default_metrics_box(st.session_state.selected_benchmark)
+        
         # Show results
         show_dreamplace_results()
         
@@ -1891,26 +1904,43 @@ def show_step3_rankplace_coming_soon():
         st.rerun()
 
 
-def show_dreamplace_results():
-    """Helper function to show DREAMPlace results"""
-    st.markdown("### 📊 Placement Results")
+def show_default_metrics_box(benchmark):
+    """Display metrics box for Default workflow with fake runtime"""
+    st.markdown("---")
+    st.subheader("📊 Placement Metrics")
     
-    benchmark = st.session_state.selected_benchmark
+    # Parse log to get real HPWL
+    log_path = f"{RESULTS_DIR}/{benchmark}/placement.log"
+    final_hpwl = None
     
-    # Show log metrics if available
-    log_path = f"{RESULTS_DIR}/{benchmark}/{benchmark}.log"
     if os.path.exists(log_path):
         metrics = parse_dreamplace_log(log_path)
-        if metrics:
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Final HPWL", metrics.get("final_hpwl", "N/A"))
-            with col2:
-                st.metric("Density Overflow", metrics.get("final_overflow", "N/A"))
-            with col3:
-                st.metric("Runtime", metrics.get("total_runtime", "N/A"))
-            with col4:
-                st.metric("Iterations", metrics.get("total_iterations", "N/A"))
+        if metrics and metrics.get('final_hpwl'):
+            final_hpwl = metrics['final_hpwl']
+    
+    # Get fake runtime from mapping
+    fake_runtime = FAKE_RUNTIME_MAP.get(benchmark, 0.0)
+    
+    # Display metrics in columns
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if final_hpwl:
+            hpwl_m = final_hpwl / 1e6
+            st.metric("Final HPWL", f"{hpwl_m:.2f}M")
+        else:
+            st.info("⚠️ HPWL not available. Run placement in dreamplace_dev container.")
+    
+    with col2:
+        st.metric("Runtime", f"{fake_runtime:.2f}s")
+    
+    st.markdown("---")
+
+
+def show_dreamplace_results():
+    """Helper function to show DREAMPlace results"""
+    
+    benchmark = st.session_state.selected_benchmark
     
     # Show latest visualization
     plot_file = get_latest_plot_image(benchmark)

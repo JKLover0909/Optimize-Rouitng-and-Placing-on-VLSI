@@ -1,6 +1,18 @@
 docker stop $(docker ps -q --filter "name=maskplace_train")
 docker rm $(docker ps -aq --filter "name=maskplace_train")
 bash train_parallel_4.sh
+python PPO2.py --list_models
+# Load checkpoint và tiếp tục train
+python3 PPO2.py \
+    --benchmark adaptec1 \
+    --ordering_method pagerank \
+    --pnm 128 \
+    --model_path save_models/net_dict-adaptec1-pagerank-128-2024-12-18-10-30-45--1531.pkl
+
+python PPO2_infer.py \
+    --model_path ./save_models/net_dict-adaptec1-pagerank-128-2025-12-19-11-28-50--14733.pkl
+    --benchmark adaptec1 \
+    --ordering_method eigenvector
 
 #!/bin/bash
 # Complete Setup Guide for VLSI Placement Research Project
