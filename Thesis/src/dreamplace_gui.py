@@ -563,13 +563,11 @@ def run_nthu_route(input_gr_file, output_dir, output_container=None, routing_con
 
 
 def run_routing_visualization(routing_output_file, run_output_dir, output_container=None):
-    """Run visualization script on routing output and save into routing_visualize/<run>."""
+    """Run visualization script on routing output and save into {run_output_dir}/routing_visualize/."""
 
     visualize_script = os.path.join(SRC_DIR, "visualize_routing.py")
-    visualization_dir = os.path.join(
-        ROUTING_VISUALIZE_DIR,
-        os.path.basename(os.path.abspath(run_output_dir.rstrip(os.sep)))
-    )
+    # Create routing_visualize folder INSIDE the current run folder
+    visualization_dir = os.path.join(run_output_dir, "routing_visualize")
 
     if not os.path.exists(visualize_script):
         return False, f"Visualization script not found: {visualize_script}", None
@@ -1540,30 +1538,47 @@ def show_step7_view_routing_results():
         else:
             st.warning("Metrics not available.")
     
-    # Display routing layer images
-    st.subheader("🗺️ Routing Layer Visualizations")
+    # Display routing visualizations (inside routing_visualize subfolder)
+    st.subheader("📊 Routing Visualizations")
     
-    vis_root = visualize_folder if visualize_folder and os.path.exists(visualize_folder) else output_folder
+    # Check routing_visualize subfolder
+    vis_root = os.path.join(output_folder, "routing_visualize")
+    if not os.path.exists(vis_root):
+        st.warning("Visualization folder not found. Visualizations may not have been generated.")
+        vis_root = output_folder
+    
+    # 1. Display 3D Overview
+    st.markdown("##### 🎯 3D Multi-Layer Overview")
+    overview_path = os.path.join(vis_root, "routing_3d_overview.png")
+    if os.path.exists(overview_path):
+        st.image(overview_path, caption="Routing 3D Overview (All Layers)", use_column_width=True)
+    else:
+        st.info("3D overview image not found.")
+    
+    st.divider()
+    
+    # 2. Display congestion heatmap
+    st.markdown("##### 🌡️ Congestion Heatmap")
+    heatmap_path = os.path.join(vis_root, "congestion_heatmap.png")
+    if os.path.exists(heatmap_path):
+        st.image(heatmap_path, caption="Routing Congestion Heatmap (All Layers)", use_column_width=True)
+    else:
+        st.info("Congestion heatmap not found.")
+    
+    st.divider()
+    
+    # 3. Display layer-by-layer visualizations
+    st.markdown("##### 🗺️ Layer-by-Layer Visualizations")
     layer_images = sorted(glob.glob(os.path.join(vis_root, "routing_layer*.png")))
     
     if layer_images:
-        # Display in grid
-        cols = st.columns(min(3, len(layer_images)))
-        for idx, img_path in enumerate(layer_images):
-            col_idx = idx % 3
-            with cols[col_idx]:
+        # Create tabs for each layer
+        tabs = st.tabs([f"Layer {i}" for i in range(len(layer_images))])
+        for tab, img_path in zip(tabs, layer_images):
+            with tab:
                 st.image(img_path, caption=os.path.basename(img_path), use_column_width=True)
     else:
         st.info("No routing layer images found.")
-    
-    # Display congestion heatmap
-    st.subheader("🌡️ Congestion Heatmap")
-    heatmap_path = os.path.join(vis_root, "congestion_heatmap.png")
-    
-    if os.path.exists(heatmap_path):
-        st.image(heatmap_path, caption="Congestion Heatmap", use_column_width=True)
-    else:
-        st.info("Congestion heatmap not found.")
     
     # List all output files
     st.subheader("📁 Output Files")
@@ -2101,20 +2116,20 @@ def show_step6_routing_visualization(): # type: ignore
     # Find output .out file
     output_file = None
     if st.session_state.routing_output_dir:
-        out_files = list(Path(st.session_state.routing_output_dir).glob("*.out"))
+        out_files = list(Path(st.session_state.routing_output_dir).glob("output"))
         if out_files:
             output_file = str(out_files[0])
     
     if not output_file:
-        st.error("❌ No routing output (.out) file found!")
+        st.error("❌ No routing output file found!")
         if st.button("⬅️ Back to NthuRoute"):
             st.session_state.step = 5
             st.rerun()
         return
     
-    # Check if visualization exists
-    visualize_dir = st.session_state.routing_visualize_dir
-    if visualize_dir and os.path.exists(visualize_dir):
+    # Check if visualization exists (now inside routing folder)
+    visualize_dir = os.path.join(st.session_state.routing_output_dir, "routing_visualize")
+    if os.path.exists(visualize_dir) and any(Path(visualize_dir).glob("*.png")):
         st.markdown('<div class="success-box">✅ Visualization completed!</div>', unsafe_allow_html=True)
         
         # Show visualization
@@ -2146,10 +2161,8 @@ def show_step6_routing_visualization(): # type: ignore
             )
             
             if success:
-                # Set visualize directory
-                benchmark = st.session_state.selected_benchmark
-                routing_dir_name = os.path.basename(st.session_state.routing_output_dir)
-                visualize_dir = os.path.join(ROUTING_VISUALIZE_DIR, routing_dir_name)
+                # Visualization folder is now inside routing folder
+                visualize_dir = os.path.join(st.session_state.routing_output_dir, "routing_visualize")
                 st.session_state.routing_visualize_dir = visualize_dir
                 
                 st.success("✅ Visualization completed!")
@@ -2334,20 +2347,16 @@ def show_step6_routing_visualization():
     
     st.write("Generate visualization of the routing solution.")
     
-    # Find output .out file
-    output_file = None
-    if st.session_state.routing_output_dir:
-        out_files = list(Path(st.session_state.routing_output_dir).glob("*.out"))
-        if out_files:
-            output_file = str(out_files[0])
+    # Find output file (now just called "output", not .out)
+    output_file = os.path.join(st.session_state.routing_output_dir, "output")
     
-    if not output_file:
-        st.error("❌ No routing output (.out) file found!")
+    if not os.path.exists(output_file):
+        st.error("❌ No routing output file found!")
         return
     
-    # Check if visualization exists
-    visualize_dir = st.session_state.routing_visualize_dir
-    if visualize_dir and os.path.exists(visualize_dir):
+    # Check if visualization exists (now inside routing folder)
+    visualize_dir = os.path.join(st.session_state.routing_output_dir, "routing_visualize")
+    if os.path.exists(visualize_dir) and any(Path(visualize_dir).glob("*.png")):
         st.markdown('<div class="success-box">✅ Visualization completed!</div>', unsafe_allow_html=True)
         
         # Show visualization
@@ -2374,10 +2383,8 @@ def show_step6_routing_visualization():
             )
             
             if success:
-                # Set visualize directory
-                benchmark = st.session_state.selected_benchmark
-                routing_dir_name = os.path.basename(st.session_state.routing_output_dir)
-                visualize_dir = f"routing_visualize/{routing_dir_name}"
+                # Visualization folder is now inside routing folder
+                visualize_dir = os.path.join(st.session_state.routing_output_dir, "routing_visualize")
                 st.session_state.routing_visualize_dir = visualize_dir
                 st.success("✅ Visualization completed!")
                 st.rerun()
