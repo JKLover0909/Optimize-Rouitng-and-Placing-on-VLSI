@@ -447,27 +447,20 @@ Examples:
         create_congestion_heatmap(nets, grid_size, str(heatmap_file))
     else:
         # Determine which layers to visualize
+        # Only visualize layer 1 (requested)
         if args.layers:
             layers_to_viz = args.layers
         else:
-            layers_to_viz = list(range(max_z + 1))
-        
-        # Visualize each layer
+            layers_to_viz = [1]
+
+        # Visualize requested layers (expected: only layer 1)
         for layer in layers_to_viz:
             if layer > max_z:
                 print(f"Warning: Layer {layer} exceeds max layer {max_z}, skipping")
                 continue
-            
+
             layer_file = output_dir / f'routing_layer{layer}.png'
             visualize_routing_layer(nets, layer, str(layer_file))
-        
-        # Create congestion heatmap
-        heatmap_file = output_dir / 'congestion_heatmap.png'
-        create_congestion_heatmap(nets, grid_size, str(heatmap_file))
-        
-        # Create 3D overview
-        overview_file = output_dir / 'routing_3d_overview.png'
-        visualize_3d_overview(nets, str(overview_file))
     
     print("\n" + "="*60)
     print("✓ Visualization complete!")

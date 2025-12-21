@@ -319,9 +319,14 @@ def parse_dreamplace_log(log_path):
     try:
         with open(log_path, 'r') as f:
             for line in f:
-                # Parse iteration metrics
-                # Format: iteration 404, ( 404,  0,  0), Obj 4.291653E+07, DensityWeight 4.309693E-05, wHPWL 7.124266E+07, Overflow 5.932706E-01
+                # Parse iteration metrics - support multiple formats
+                # Format 1: iteration 404, ( 404,  0,  0), Obj 4.291653E+07, DensityWeight 4.309693E-05, wHPWL 7.124266E+07, Overflow 5.932706E-01
+                # Format 2: iteration 404, HPWL=7.124266E+07, Overflow=5.932706E-01
                 match = re.search(r'iteration\s+(\d+),.*wHPWL\s+([0-9.E+\-]+).*Overflow\s+([0-9.E+\-]+)', line)
+                if not match:
+                    # Try alternative format with HPWL= and Overflow=
+                    match = re.search(r'iteration\s+(\d+),.*HPWL[=\s]+([0-9.E+\-]+).*Overflow[=\s]+([0-9.E+\-]+)', line)
+                
                 if match:
                     iter_num = int(match.group(1))
                     hpwl = float(match.group(2))
@@ -1538,8 +1543,8 @@ def show_step7_view_routing_results():
         else:
             st.warning("Metrics not available.")
     
-    # Display routing visualizations (inside routing_visualize subfolder)
-    st.subheader("📊 Routing Visualizations")
+    # Display routing visualization (only layer 1)
+    st.subheader("📊 Routing Visualization (Layer 1)")
     
     # Check routing_visualize subfolder
     vis_root = os.path.join(output_folder, "routing_visualize")
@@ -1547,38 +1552,11 @@ def show_step7_view_routing_results():
         st.warning("Visualization folder not found. Visualizations may not have been generated.")
         vis_root = output_folder
     
-    # 1. Display 3D Overview
-    st.markdown("##### 🎯 3D Multi-Layer Overview")
-    overview_path = os.path.join(vis_root, "routing_3d_overview.png")
-    if os.path.exists(overview_path):
-        st.image(overview_path, caption="Routing 3D Overview (All Layers)", use_column_width=True)
+    layer1_path = os.path.join(vis_root, "routing_layer1.png")
+    if os.path.exists(layer1_path):
+        st.image(layer1_path, caption="Routing Layer 1", use_column_width=True)
     else:
-        st.info("3D overview image not found.")
-    
-    st.divider()
-    
-    # 2. Display congestion heatmap
-    st.markdown("##### 🌡️ Congestion Heatmap")
-    heatmap_path = os.path.join(vis_root, "congestion_heatmap.png")
-    if os.path.exists(heatmap_path):
-        st.image(heatmap_path, caption="Routing Congestion Heatmap (All Layers)", use_column_width=True)
-    else:
-        st.info("Congestion heatmap not found.")
-    
-    st.divider()
-    
-    # 3. Display layer-by-layer visualizations
-    st.markdown("##### 🗺️ Layer-by-Layer Visualizations")
-    layer_images = sorted(glob.glob(os.path.join(vis_root, "routing_layer*.png")))
-    
-    if layer_images:
-        # Create tabs for each layer
-        tabs = st.tabs([f"Layer {i}" for i in range(len(layer_images))])
-        for tab, img_path in zip(tabs, layer_images):
-            with tab:
-                st.image(img_path, caption=os.path.basename(img_path), use_column_width=True)
-    else:
-        st.info("No routing layer images found.")
+        st.info("No routing layer 1 image found.")
     
     # List all output files
     st.subheader("📁 Output Files")
@@ -1759,46 +1737,23 @@ def show_step3_ranking_config():
     
     # Ranking algorithm
     st.markdown("### 3️⃣ Ranking Algorithm")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        **🔗 PageRank**
-        - Graph-based ranking
-        - High-quality connections
-        - ✅ Recommended
-        - 7.64% better than Eigenvector
-        """)
-        pagerank_btn = st.button("Select PageRank", key="algo_pagerank", width='stretch', type="primary")
-    
-    with col2:
-        st.markdown("""
-        **📊 Eigenvector Centrality**
-        - Node importance
-        - Connected node values
-        - Baseline algorithm
-        """)
-        eigenvector_btn = st.button("Select Eigenvector", key="algo_eigenvector", width='stretch')
-    
-    with col3:
-        st.markdown("""
-        **📈 Degree Centrality**
-        - Connection count
-        - Simple ranking
-        - Fast computation
-        """)
-        degree_btn = st.button("Select Degree", key="algo_degree", width='stretch')
-    
-    # Handle algorithm selection
-    if pagerank_btn:
-        ranking_algorithm = "pagerank"
-    elif eigenvector_btn:
-        ranking_algorithm = "eigenvector"
-    elif degree_btn:
-        ranking_algorithm = "degree"
-    else:
-        ranking_algorithm = st.session_state.ranking_algorithm  # Keep current
+
+    algo_display = {
+        "pagerank": "🔗 PageRank (Recommended)",
+        "eigenvector": "📊 Eigenvector Centrality",
+        "degree": "📈 Degree Centrality"
+    }
+
+    ranking_algorithm = st.radio(
+        "Choose ranking algorithm:",
+        options=["pagerank", "eigenvector", "degree"],
+        format_func=lambda x: algo_display[x],
+        index=["pagerank", "eigenvector", "degree"].index(st.session_state.ranking_algorithm),
+        key="ranking_algorithm_radio",
+        horizontal=True
+    )
+    # Persist selection immediately for single-click behavior
+    st.session_state.ranking_algorithm = ranking_algorithm
     
     # Show current selection
     st.markdown("---")
@@ -1944,7 +1899,11 @@ def show_default_metrics_box(benchmark):
             hpwl_m = final_hpwl / 1e6
             st.metric("Final HPWL", f"{hpwl_m:.2f}M")
         else:
-            st.info("⚠️ HPWL not available. Run placement in dreamplace_dev container.")
+            st.warning(f"⚠️ HPWL not available. Log file: `{log_path}`")
+            if not os.path.exists(log_path):
+                st.info("💡 Run placement in `dreamplace_dev` container to generate results.")
+            else:
+                st.info("💡 Log file exists but HPWL could not be parsed. Check log format.")
     
     with col2:
         st.metric("Runtime", f"{fake_runtime:.2f}s")
@@ -2405,15 +2364,22 @@ def show_step7_routing_visualization():
     
     st.write("Generate visualization of the routing solution.")
     
-    # Find output .out file
+    # Find output file (named "output", no extension)
     output_file = None
     if st.session_state.routing_output_dir:
-        out_files = list(Path(st.session_state.routing_output_dir).glob("*.out"))
-        if out_files:
-            output_file = str(out_files[0])
+        # Check for "output" file (nthu-route standard output)
+        output_path = os.path.join(st.session_state.routing_output_dir, "output")
+        if os.path.exists(output_path):
+            output_file = output_path
+        else:
+            # Fallback: check for .out files
+            out_files = list(Path(st.session_state.routing_output_dir).glob("*.out"))
+            if out_files:
+                output_file = str(out_files[0])
     
     if not output_file:
-        st.error("❌ No routing output (.out) file found!")
+        st.error(f"❌ No routing output file found in `{st.session_state.routing_output_dir}`!")
+        st.info("💡 Expected file: `output` (no extension)")
         return
     
     # Check if visualization exists
@@ -2445,10 +2411,8 @@ def show_step7_routing_visualization():
             )
             
             if success:
-                # Set visualize directory
-                benchmark = st.session_state.selected_benchmark
-                routing_dir_name = os.path.basename(st.session_state.routing_output_dir)
-                visualize_dir = os.path.join(ROUTING_VISUALIZE_DIR, routing_dir_name)
+                # Set visualize directory inside the current routing output folder
+                visualize_dir = os.path.join(st.session_state.routing_output_dir, "routing_visualize")
                 st.session_state.routing_visualize_dir = visualize_dir
                 
                 st.success("✅ Visualization completed!")
@@ -2463,51 +2427,19 @@ def show_step7_routing_visualization():
 
 
 def show_routing_visualization_results(visualize_dir):
-    """Show routing visualization images"""
-    st.markdown("### 🖼️ Routing Visualization")
-    
-    # Find PNG files
-    png_files = list(Path(visualize_dir).glob("*.png"))
-    
-    if not png_files:
-        st.warning("No visualization images found.")
-        return
-    
-    # Show images in tabs by layer
-    layers = {}
-    for png_file in png_files:
-        filename = png_file.name
-        if "layer" in filename.lower():
-            # Extract layer number
-            import re
-            match = re.search(r'layer[_-]?(\d+)', filename, re.IGNORECASE)
-            if match:
-                layer_num = int(match.group(1))
-                layers[layer_num] = str(png_file)
-    
-    if layers:
-        # Sort by layer number
-        sorted_layers = sorted(layers.items())
-        
-        # Create tabs for each layer
-        tab_names = [f"Layer {layer}" for layer, _ in sorted_layers]
-        tabs = st.tabs(tab_names)
-        
-        for tab, (layer, img_path) in zip(tabs, sorted_layers):
-            with tab:
-                try:
-                    img = Image.open(img_path)
-                    st.image(img, caption=f"Routing Layer {layer}", width='stretch')
-                except Exception as e:
-                    st.error(f"Could not load image: {e}")
+    """Show routing visualization image (layer 1 only)."""
+    st.markdown("### 🖼️ Routing Visualization (Layer 1)")
+
+    layer1_path = Path(visualize_dir) / "routing_layer1.png"
+
+    if layer1_path.exists():
+        try:
+            img = Image.open(layer1_path)
+            st.image(img, caption="Routing Layer 1", width='stretch')
+        except Exception as e:
+            st.error(f"Could not load image: {e}")
     else:
-        # Show all images if layer structure not found
-        for png_file in png_files:
-            try:
-                img = Image.open(png_file)
-                st.image(img, caption=png_file.name, width='stretch')
-            except Exception as e:
-                st.error(f"Could not load {png_file.name}: {e}")
+        st.warning(f"No routing_layer1.png found in {visualize_dir}.")
 
 
 if __name__ == "__main__":
