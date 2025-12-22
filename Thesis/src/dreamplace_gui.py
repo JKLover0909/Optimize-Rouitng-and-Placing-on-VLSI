@@ -134,6 +134,8 @@ if 'convert_completed' not in st.session_state:
     st.session_state.convert_completed = False
 if 'routing_visualize_dir' not in st.session_state:
     st.session_state.routing_visualize_dir = None
+if 'rankplace_completed' not in st.session_state:
+    st.session_state.rankplace_completed = False
 
 def get_available_benchmarks():
     """Scan and return all available benchmarks in ispd2005 folder."""
@@ -656,7 +658,12 @@ def main():
             steps = [
                 (1, "Step 1: Select Benchmark"),
                 (2, "Step 2: Select Workflow"),
-                (3, "Step 3: RankPlace (Coming Soon)")
+                (3, "Step 3: Select Algorithm"),
+                (4, "Step 4: Run MaskPlace Inference"),
+                (5, "Step 5: Run DREAMPlace"),
+                (6, "Step 6: Convert to Routing"),
+                (7, "Step 7: Run NthuRoute"),
+                (8, "Step 8: Visualize Results")
             ]
         else:
             # No workflow selected yet
@@ -713,24 +720,36 @@ def main():
         elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
             show_step3_ranking_config()
         elif st.session_state.selected_workflow == "RankPlace":
-            show_step3_rankplace_coming_soon()
+            show_step3_rankplace_algorithm_selection()
     elif st.session_state.step == 4:
         if st.session_state.selected_workflow == "Default":
             show_step4_routing_conversion()
         elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
             show_step4_ranking_dreamplace()
+        elif st.session_state.selected_workflow == "RankPlace":
+            show_step4_rankplace_inference()
     elif st.session_state.step == 5:
         if st.session_state.selected_workflow == "Default":
             show_step5_nthu_route()
         elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
             show_step5_routing_conversion()
+        elif st.session_state.selected_workflow == "RankPlace":
+            show_step5_rankplace_dreamplace()
     elif st.session_state.step == 6:
         if st.session_state.selected_workflow == "Default":
             show_step6_routing_visualization()
         elif st.session_state.selected_workflow == "Ranking + DREAMPlace":
             show_step6_nthu_route()
+        elif st.session_state.selected_workflow == "RankPlace":
+            show_step6_rankplace_routing_conversion()
     elif st.session_state.step == 7:
-        show_step7_routing_visualization()
+        if st.session_state.selected_workflow == "Ranking + DREAMPlace":
+            show_step7_routing_visualization()
+        elif st.session_state.selected_workflow == "RankPlace":
+            show_step7_rankplace_nthu_route()
+    elif st.session_state.step == 8:
+        if st.session_state.selected_workflow == "RankPlace":
+            show_step8_rankplace_visualization()
 
 def show_step1_benchmark_selection():
     """Step 1: Select benchmark from ISPD2005."""
@@ -1627,12 +1646,12 @@ def show_step2_workflow_selection():
     with col3:
         st.markdown("""
         ### 🚀 RankPlace
-        **MaskPlace with Centrality**
+        **MaskPlace + DREAMPlace**
         - RL-based macro placement
-        - Centrality ordering
-        - Coming Soon...
+        - Automated .pl merge
+        - Advanced workflow
         """)
-        if st.button("Select RankPlace (Coming Soon)", key="workflow_rankplace", width='stretch', disabled=True):
+        if st.button("Select RankPlace", key="workflow_rankplace", width='stretch', type="primary"):
             st.session_state.selected_workflow = "RankPlace"
             st.session_state.step = 3
             st.rerun()
@@ -1844,34 +1863,6 @@ def show_step4_ranking_dreamplace():
         if st.button("⬅️ Back to Configuration"):
             st.session_state.step = 3
             st.rerun()
-
-
-def show_step3_rankplace_coming_soon():
-    """Step 3: RankPlace - Coming Soon"""
-    st.markdown('<div class="step-header">Step 3: RankPlace (Coming Soon)</div>', unsafe_allow_html=True)
-    
-    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Workflow: <strong>RankPlace</strong></div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="warning-box">
-    <h3>🚧 Under Development</h3>
-    <p>RankPlace workflow integrates MaskPlace (RL-based macro placement) with centrality ordering.</p>
-    <p><strong>Features:</strong></p>
-    <ul>
-        <li>Parse macro components from benchmark</li>
-        <li>Compute centrality (PageRank/Eigenvector/Degree)</li>
-        <li>Run MaskPlace with centrality ordering</li>
-        <li>Generate .pl file with placed macros</li>
-        <li>Run DREAMPlace for standard cell placement</li>
-    </ul>
-    <p>This feature will be available in the next update.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Back button
-    if st.button("⬅️ Back to Workflow Selection"):
-        st.session_state.step = 2
-        st.rerun()
 
 
 def show_default_metrics_box(benchmark):
@@ -2440,6 +2431,485 @@ def show_routing_visualization_results(visualize_dir):
             st.error(f"Could not load image: {e}")
     else:
         st.warning(f"No routing_layer1.png found in {visualize_dir}.")
+
+
+# ==================== RANKPLACE WORKFLOW (WORKFLOW 3) ====================
+
+MASKPLACE_DIR = os.path.join(THESIS_DIR, "MaskPlace", "maskplace")
+MASKPLACE_SAVE_MODELS_DIR = os.path.join(MASKPLACE_DIR, "save_models")
+MASKPLACE_INFERENCE_RESULTS_DIR = os.path.join(MASKPLACE_DIR, "inference_results")
+
+
+def get_rankplace_checkpoint(benchmark, algorithm):
+    """Get MaskPlace checkpoint path for given benchmark and algorithm."""
+    checkpoint_name = f"{benchmark}-{algorithm}.pkl"
+    checkpoint_path = os.path.join(MASKPLACE_SAVE_MODELS_DIR, checkpoint_name)
+    return checkpoint_path if os.path.exists(checkpoint_path) else None
+
+
+def run_maskplace_inference(benchmark, algorithm, output_container=None):
+    """
+    Run MaskPlace inference via docker container
+    
+    Returns:
+        (success: bool, output: str, inference_result_pl: str or None)
+    """
+    checkpoint_path = get_rankplace_checkpoint(benchmark, algorithm)
+    if not checkpoint_path:
+        return False, f"Checkpoint not found for {benchmark}-{algorithm}", None
+    
+    # Build Docker exec command with proper working directory and PYTHONPATH
+    # Use bash -c to set working directory before running Python
+    cmd_str = (
+        f"cd /MaskPlace/maskplace && "
+        f"PYTHONPATH=/MaskPlace/maskplace:/MaskPlace/maskplace/ariane "
+        f"python3 PPO2_infer.py "
+        f"--model_path ./save_models/{benchmark}-{algorithm}.pkl "
+        f"--benchmark {benchmark} "
+        f"--ordering_method {algorithm}"
+    )
+    
+    cmd = [
+        'docker', 'exec', 'maskplace_dev',
+        'bash', '-c', cmd_str
+    ]
+    
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        
+        output_lines = []
+        if output_container:
+            log_placeholder = output_container.empty()
+        
+        for line in process.stdout:  # type: ignore
+            output_lines.append(line)
+            if output_container:
+                log_placeholder.code(''.join(output_lines[-50:]), language='text')
+        
+        process.wait()
+        full_output = ''.join(output_lines)
+        
+        if process.returncode == 0:
+            # Find the generated .pl file from inference_results
+            inference_pl_files = glob.glob(
+                os.path.join(MASKPLACE_INFERENCE_RESULTS_DIR, f"{algorithm}-*.pl")
+            )
+            latest_pl = max(inference_pl_files, key=os.path.getctime) if inference_pl_files else None
+            
+            return True, full_output, latest_pl
+        else:
+            return False, full_output, None
+    
+    except Exception as e:
+        return False, str(e), None
+
+
+def merge_maskplace_with_original(benchmark, maskplace_pl, output_container=None):
+    """
+    Merge MaskPlace output with original .pl file
+    
+    Returns:
+        (success: bool, output: str, merged_pl_path: str)
+    """
+    original_pl = os.path.join(BENCHMARKS_DIR, benchmark, f"{benchmark}.pl.original")
+    merged_pl = os.path.join(BENCHMARKS_DIR, benchmark, f"{benchmark}.pl")
+    
+    if not os.path.exists(original_pl):
+        return False, f"Original placement not found: {original_pl}", None
+    
+    if not os.path.exists(maskplace_pl):
+        return False, f"MaskPlace placement not found: {maskplace_pl}", None
+    
+    # Run merger script
+    merger_script = os.path.join(SRC_DIR, "rankplace_merger.py")
+    cmd = [
+        'python3', merger_script,
+        '--original', original_pl,
+        '--maskplace', maskplace_pl,
+        '--output', merged_pl
+    ]
+    
+    try:
+        process = subprocess.Popen(
+            cmd,
+            cwd=SRC_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        
+        output_lines = []
+        if output_container:
+            log_placeholder = output_container.empty()
+        
+        for line in process.stdout:  # type: ignore
+            output_lines.append(line)
+            if output_container:
+                log_placeholder.code(''.join(output_lines), language='text')
+        
+        process.wait()
+        full_output = ''.join(output_lines)
+        
+        if process.returncode == 0:
+            return True, full_output, merged_pl
+        else:
+            return False, full_output, None
+    
+    except Exception as e:
+        return False, str(e), None
+
+
+def show_step3_rankplace_algorithm_selection():
+    """Step 3: RankPlace - Select algorithm"""
+    st.markdown('<div class="step-header">Step 3: Select RankPlace Algorithm</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Workflow: <strong>RankPlace (MaskPlace + DREAMPlace)</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Choose a macro placement algorithm from MaskPlace:")
+    
+    algo_info = {
+        "default": {
+            "label": "🔧 Default",
+            "description": "Topology-based macro ordering (no centrality)",
+            "note": "Baseline approach"
+        },
+        "pagerank": {
+            "label": "🔗 PageRank",
+            "description": "Graph-based ranking (recommended)",
+            "note": "Best performance"
+        },
+        "eigenvector": {
+            "label": "📊 Eigenvector Centrality",
+            "description": "Node importance from connected nodes",
+            "note": "Alternative centrality"
+        },
+        "degree": {
+            "label": "📈 Degree Centrality",
+            "description": "Simple connection count ranking",
+            "note": "Fast computation"
+        }
+    }
+    
+    cols = st.columns(2)
+    for idx, (algo_id, info) in enumerate(algo_info.items()):
+        with cols[idx % 2]:
+            st.markdown(f"**{info['label']}**")
+            st.caption(info['description'])
+            st.caption(f"💡 {info['note']}")
+            
+            # Check if checkpoint exists
+            checkpoint = get_rankplace_checkpoint(st.session_state.selected_benchmark, algo_id)
+            if checkpoint:
+                if st.button(
+                    f"Select {algo_id.title()}",
+                    key=f"rankplace_algo_{algo_id}",
+                    use_container_width=True,
+                    type="primary" if st.session_state.ranking_algorithm == algo_id else "secondary"
+                ):
+                    st.session_state.ranking_algorithm = algo_id
+                    st.session_state.step = 4
+                    st.rerun()
+            else:
+                st.warning(f"❌ Checkpoint not found")
+                st.caption(f"Expected: {st.session_state.selected_benchmark}-{algo_id}.pkl")
+    
+    # Back button
+    st.markdown("---")
+    if st.button("⬅️ Back to Workflow Selection"):
+        st.session_state.step = 2
+        st.rerun()
+
+
+def show_step4_rankplace_inference():
+    """Step 4: RankPlace - Run MaskPlace inference and merge"""
+    st.markdown('<div class="step-header">Step 4: Run RankPlace (MaskPlace Inference)</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong><br>Algorithm: <strong>{st.session_state.ranking_algorithm.title()}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Run MaskPlace inference and merge macro placements with original file.")
+    
+    if st.button("🚀 Run RankPlace Inference", type="primary", use_container_width=True):
+        # Step 1: Run MaskPlace inference
+        st.subheader("Step 1: Running MaskPlace Inference...")
+        log_container = st.empty()
+        
+        success_infer, output_infer, maskplace_pl = run_maskplace_inference(
+            st.session_state.selected_benchmark,
+            st.session_state.ranking_algorithm,
+            output_container=log_container
+        )
+        
+        if not success_infer:
+            st.error("❌ MaskPlace inference failed!")
+            st.error(output_infer)
+            return
+        
+        st.success("✅ MaskPlace inference completed!")
+        
+        # Show inference metrics (read CSV if available)
+        if maskplace_pl:
+            csv_file = maskplace_pl.replace('.pl', '.csv')
+        else:
+            csv_file = None
+        if csv_file and os.path.exists(csv_file):
+            st.subheader("📊 MaskPlace Inference Results")
+            df = pd.read_csv(csv_file)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                best_hpwl = df['hpwl'].min()
+                st.metric("Best HPWL", f"{int(best_hpwl)}")
+            with col2:
+                best_cost = df.loc[df['hpwl'].idxmin(), 'cost']
+                st.metric("Best Cost", f"{best_cost:.2f}")
+            with col3:
+                avg_score = df['score'].mean()
+                st.metric("Avg Score", f"{avg_score:.2f}")
+            
+            with st.expander("View all runs"):
+                st.dataframe(df, use_container_width=True)
+        
+        # Step 2: Merge placement files
+        st.subheader("Step 2: Merging Placement Files...")
+        merge_log_container = st.empty()
+        
+        success_merge, output_merge, merged_pl = merge_maskplace_with_original(
+            st.session_state.selected_benchmark,
+            maskplace_pl,
+            output_container=merge_log_container
+        )
+        
+        if not success_merge:
+            st.error("❌ Placement merge failed!")
+            st.error(output_merge)
+            return
+        
+        st.success("✅ Placement merge completed!")
+        st.info(f"✓ Merged placement saved to: `{merged_pl}`")
+        
+        # Mark as completed
+        st.session_state.rankplace_completed = True
+        st.session_state.step = 5
+        st.balloons()
+        st.rerun()
+    
+    # Back button
+    st.markdown("---")
+    if st.button("⬅️ Back"):
+        st.session_state.step = 3
+        st.rerun()
+
+
+def show_step5_rankplace_dreamplace():
+    """Step 5: RankPlace - Run DREAMPlace on merged placement"""
+    st.markdown('<div class="step-header">Step 5: Run DREAMPlace on Merged Placement</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Run DREAMPlace with macro placement from MaskPlace already fixed.")
+    
+    if st.button("🏃 Run DREAMPlace", type="primary", use_container_width=True):
+        with st.spinner("Running DREAMPlace (this may take a few minutes)..."):
+            log_container = st.empty()
+            
+            success, output = run_dreamplace(
+                st.session_state.selected_benchmark,
+                ranking_algorithm="",
+                output_container=log_container
+            )
+            
+            if success:
+                st.session_state.dreamplace_completed = True
+                st.success("✅ DREAMPlace completed!")
+                st.rerun()
+            else:
+                st.error("❌ DREAMPlace failed!")
+                st.error(output)
+    
+    # Show results if completed
+    if st.session_state.dreamplace_completed:
+        st.markdown("---")
+        st.subheader("📊 DREAMPlace Results")
+        
+        log_file = f"{RESULTS_DIR}/{st.session_state.selected_benchmark}/placement.log"
+        metrics = parse_dreamplace_log(log_file)
+        
+        if metrics:
+            col1, col2 = st.columns(2)
+            with col1:
+                hpwl_m = metrics['final_hpwl'] / 1e6
+                st.metric("Final HPWL", f"{hpwl_m:.2f}M")
+            with col2:
+                st.metric("Final Overflow", f"{metrics['final_overflow']:.2f}%")
+        
+        # Show best visualization
+        plot_file = get_latest_plot_image(st.session_state.selected_benchmark)
+        if plot_file:
+            st.subheader("🖼️ Final Placement Visualization")
+            try:
+                rotated_img = rotate_image_180(plot_file)
+                st.image(rotated_img, caption="Final placement", width='stretch')
+            except:
+                st.warning("Could not load visualization")
+        
+        # Next button
+        if st.button("➡️ Next: Convert to Routing", type="primary"):
+            st.session_state.step = 6
+            st.rerun()
+    
+    # Back button
+    st.markdown("---")
+    if st.button("⬅️ Back"):
+        st.session_state.step = 4
+        st.rerun()
+
+
+def show_step6_rankplace_routing_conversion():
+    """Step 6: RankPlace - Convert to routing format"""
+    st.markdown('<div class="step-header">Step 6: Convert to Routing Format</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="info-box">Workflow: <strong>RankPlace</strong><br>Benchmark: <strong>{st.session_state.selected_benchmark}</strong></div>', unsafe_allow_html=True)
+    
+    st.write("Convert merged DREAMPlace output to NthuRoute input format (.gr file).")
+    
+    if st.session_state.convert_completed:
+        st.success("✅ Conversion completed!")
+        st.write(f"**Output Directory:** `{st.session_state.routing_output_dir}`")
+        
+        if st.button("➡️ Next: Run NthuRoute", type="primary"):
+            st.session_state.step = 7
+            st.rerun()
+    else:
+        if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
+            output_dir_name = get_routing_output_dir_name()
+            output_dir = os.path.join(ROUTING_RESULTS_DIR, output_dir_name)
+            output_container = st.empty()
+            
+            success = run_placement_to_routing_converter(
+                st.session_state.selected_benchmark,
+                output_dir,
+                output_container=output_container
+            )
+            
+            if success:
+                st.session_state.routing_output_dir = output_dir
+                st.session_state.convert_completed = True
+                st.success("✅ Conversion completed!")
+                st.rerun()
+            else:
+                st.error("❌ Conversion failed!")
+    
+    # Back button
+    st.markdown("---")
+    if st.button("⬅️ Back"):
+        st.session_state.step = 5
+        st.rerun()
+
+
+def show_step7_rankplace_nthu_route():
+    """Step 7: RankPlace - Run NthuRoute"""
+    st.markdown('<div class="step-header">Step 7: Run NthuRoute</div>', unsafe_allow_html=True)
+    
+    st.write("Run global routing on the merged placement.")
+    
+    if st.session_state.routing_completed:
+        st.success("✅ Routing completed!")
+        
+        if st.button("➡️ Next: Visualize Results", type="primary"):
+            st.session_state.step = 8
+            st.rerun()
+    else:
+        # Find input .gr file
+        input_gr_file = None
+        if st.session_state.routing_output_dir:
+            gr_files = list(Path(st.session_state.routing_output_dir).glob("*.gr"))
+            if gr_files:
+                input_gr_file = str(gr_files[0])
+        
+        if not input_gr_file:
+            st.error("❌ No .gr file found! Please run conversion first.")
+            return
+        
+        if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
+            output_container = st.empty()
+            
+            success = run_nthu_route(
+                input_gr_file,
+                st.session_state.routing_output_dir,
+                output_container=output_container,
+                routing_config=NTHU_PARAMS
+            )
+            
+            if success:
+                st.session_state.routing_completed = True
+                st.success("✅ Routing completed!")
+                st.rerun()
+            else:
+                st.error("❌ Routing failed!")
+    
+    # Back button
+    st.markdown("---")
+    if st.button("⬅️ Back"):
+        st.session_state.step = 6
+        st.rerun()
+
+
+def show_step8_rankplace_visualization():
+    """Step 8: RankPlace - Visualize routing results"""
+    st.markdown('<div class="step-header">Step 8: Visualize Routing</div>', unsafe_allow_html=True)
+    
+    st.write("View routing visualization results.")
+    
+    # Find output file
+    output_file = os.path.join(st.session_state.routing_output_dir, "output")
+    
+    if not os.path.exists(output_file):
+        st.error("❌ No routing output file found!")
+        return
+    
+    # Check for visualization
+    visualize_dir = st.session_state.routing_visualize_dir
+    if visualize_dir and os.path.exists(visualize_dir):
+        st.success("✅ Visualization ready!")
+        show_routing_visualization_results(visualize_dir)
+        
+        if st.button("🎉 Finish Workflow", type="primary"):
+            st.balloons()
+            st.success("✅ RankPlace workflow completed successfully!")
+        
+        if st.button("🔄 Start New Workflow"):
+            reset_workflow()
+            st.rerun()
+    else:
+        if st.button("🎨 Generate Visualization", type="primary", use_container_width=True):
+            output_container = st.empty()
+            
+            success = run_routing_visualization(
+                output_file,
+                st.session_state.routing_output_dir,
+                output_container=output_container
+            )
+            
+            if success:
+                visualize_dir = os.path.join(st.session_state.routing_output_dir, "routing_visualize")
+                st.session_state.routing_visualize_dir = visualize_dir
+                st.success("✅ Visualization generated!")
+                st.rerun()
+            else:
+                st.error("❌ Visualization failed!")
+    
+    # Back button
+    st.markdown("---")
+    if st.button("⬅️ Back"):
+        st.session_state.step = 7
+        st.rerun()
 
 
 if __name__ == "__main__":
