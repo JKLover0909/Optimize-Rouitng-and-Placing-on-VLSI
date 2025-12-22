@@ -1970,7 +1970,7 @@ def show_step4_routing_conversion():
             st.rerun()
     else:
         # Run conversion
-        if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
+        if st.button("🔄 Run Conversion", type="primary", width='stretch'):
             output_dir_name = get_routing_output_dir_name()
             output_dir = os.path.join(ROUTING_RESULTS_DIR, output_dir_name)
             output_container = st.empty()
@@ -2032,7 +2032,7 @@ def show_step5_nthu_route(): # type: ignore
             return
         
         # Run routing
-        if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
+        if st.button("🚀 Run NthuRoute", type="primary", width='stretch'):
             output_container = st.empty()
             
             success = run_nthu_route(
@@ -2101,7 +2101,7 @@ def show_step6_routing_visualization(): # type: ignore
             st.rerun()
     else:
         # Run visualization
-        if st.button("🎨 Generate Visualization", type="primary", use_container_width=True):
+        if st.button("🎨 Generate Visualization", type="primary", width='stretch'):
             output_container = st.empty()
             
             success = run_routing_visualization(
@@ -2150,7 +2150,7 @@ def show_step5_routing_conversion():
             st.rerun()
     else:
         # Run conversion
-        if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
+        if st.button("🔄 Run Conversion", type="primary", width='stretch'):
             output_dir_name = get_routing_output_dir_name()
             output_dir = os.path.join(ROUTING_RESULTS_DIR, output_dir_name)
             output_container = st.empty()
@@ -2209,7 +2209,7 @@ def show_step5_nthu_route():
             return
         
         # Run routing
-        if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
+        if st.button("🚀 Run NthuRoute", type="primary", width='stretch'):
             output_container = st.empty()
             
             success = run_nthu_route(
@@ -2266,7 +2266,7 @@ def show_step6_nthu_route():
             return
         
         # Run routing
-        if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
+        if st.button("🚀 Run NthuRoute", type="primary", width='stretch'):
             output_container = st.empty()
             
             success = run_nthu_route(
@@ -2323,7 +2323,7 @@ def show_step6_routing_visualization():
             st.rerun()
     else:
         # Run visualization
-        if st.button("🎨 Generate Visualization", type="primary", use_container_width=True):
+        if st.button("🎨 Generate Visualization", type="primary", width='stretch'):
             output_container = st.empty()
             
             success = run_routing_visualization(
@@ -2392,7 +2392,7 @@ def show_step7_routing_visualization():
             st.rerun()
     else:
         # Run visualization
-        if st.button("🎨 Generate Visualization", type="primary", use_container_width=True):
+        if st.button("🎨 Generate Visualization", type="primary", width='stretch'):
             output_container = st.empty()
             
             success = run_routing_visualization(
@@ -2610,7 +2610,7 @@ def show_step3_rankplace_algorithm_selection():
                 if st.button(
                     f"Select {algo_id.title()}",
                     key=f"rankplace_algo_{algo_id}",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary" if st.session_state.ranking_algorithm == algo_id else "secondary"
                 ):
                     st.session_state.ranking_algorithm = algo_id
@@ -2635,7 +2635,7 @@ def show_step4_rankplace_inference():
     
     st.write("Run MaskPlace inference and merge macro placements with original file.")
     
-    if st.button("🚀 Run RankPlace Inference", type="primary", use_container_width=True):
+    if st.button("🚀 Run RankPlace Inference", type="primary", width='stretch'):
         # Step 1: Run MaskPlace inference
         st.subheader("Step 1: Running MaskPlace Inference...")
         log_container = st.empty()
@@ -2674,7 +2674,7 @@ def show_step4_rankplace_inference():
                 st.metric("Avg Score", f"{avg_score:.2f}")
             
             with st.expander("View all runs"):
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df, width='stretch')
         
         # Step 2: Merge placement files
         st.subheader("Step 2: Merging Placement Files...")
@@ -2715,7 +2715,7 @@ def show_step5_rankplace_dreamplace():
     
     st.write("Run DREAMPlace with macro placement from MaskPlace already fixed.")
     
-    if st.button("🏃 Run DREAMPlace", type="primary", use_container_width=True):
+    if st.button("🏃 Run DREAMPlace", type="primary", width='stretch'):
         with st.spinner("Running DREAMPlace (this may take a few minutes)..."):
             log_container = st.empty()
             
@@ -2787,7 +2787,7 @@ def show_step6_rankplace_routing_conversion():
             st.session_state.step = 7
             st.rerun()
     else:
-        if st.button("🔄 Run Conversion", type="primary", use_container_width=True):
+        if st.button("🔄 Run Conversion", type="primary", width='stretch'):
             output_dir_name = get_routing_output_dir_name()
             output_dir = os.path.join(ROUTING_RESULTS_DIR, output_dir_name)
             output_container = st.empty()
@@ -2837,7 +2837,7 @@ def show_step7_rankplace_nthu_route():
             st.error("❌ No .gr file found! Please run conversion first.")
             return
         
-        if st.button("🚀 Run NthuRoute", type="primary", use_container_width=True):
+        if st.button("🚀 Run NthuRoute", type="primary", width='stretch'):
             output_container = st.empty()
             
             success = run_nthu_route(
@@ -2888,7 +2888,7 @@ def show_step8_rankplace_visualization():
             reset_workflow()
             st.rerun()
     else:
-        if st.button("🎨 Generate Visualization", type="primary", use_container_width=True):
+        if st.button("🎨 Generate Visualization", type="primary", width='stretch'):
             output_container = st.empty()
             
             success = run_routing_visualization(
