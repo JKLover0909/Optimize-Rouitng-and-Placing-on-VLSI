@@ -1,0 +1,98 @@
+
+Collecting usage statistics. To deactivate, set browser.gatherUsageStats to false.
+
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.19.40.208:8501
+  External URL: http://171.244.52.57:8501
+
+2025-12-24 09:46:24.703 Script compilation error
+Traceback (most recent call last):
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 571, in _run_script
+    code = self._script_cache.get_bytecode(script_path)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/script_cache.py", line 68, in get_bytecode
+    with open_python_file(script_path) as f:
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/source_util.py", line 54, in open_python_file
+    return tokenize.open(filename)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/tokenize.py", line 392, in open
+    buffer = _builtin_open(filename, 'rb')
+PermissionError: [Errno 13] Permission denied: '/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py'
+2025-12-24 09:46:24.716 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-12-25 20:32:28.240 Uncaught app execution
+Traceback (most recent call last):
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 128, in exec_func_with_error_handling
+    result = func()
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 669, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 2916, in <module>
+    main()
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 719, in main
+    show_step3_default_dreamplace()
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 1698, in show_step3_default_dreamplace
+    restore_original_pl(st.session_state.selected_benchmark)
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 177, in restore_original_pl
+    shutil.copy2(backup_file, pl_file)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/shutil.py", line 444, in copy2
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/shutil.py", line 266, in copyfile
+    with open(dst, 'wb') as fdst:
+PermissionError: [Errno 13] Permission denied: '/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/DREAMPlace/install/benchmarks/ispd2005/adaptec1/adaptec1.pl'
+2025-12-25 20:32:42.327 Uncaught app execution
+Traceback (most recent call last):
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 128, in exec_func_with_error_handling
+    result = func()
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 669, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 2916, in <module>
+    main()
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 719, in main
+    show_step3_default_dreamplace()
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 1698, in show_step3_default_dreamplace
+    restore_original_pl(st.session_state.selected_benchmark)
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 177, in restore_original_pl
+    shutil.copy2(backup_file, pl_file)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/shutil.py", line 444, in copy2
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/shutil.py", line 266, in copyfile
+    with open(dst, 'wb') as fdst:
+PermissionError: [Errno 13] Permission denied: '/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/DREAMPlace/install/benchmarks/ispd2005/adaptec1/adaptec1.pl'
+2025-12-25 20:36:23.615 Uncaught app execution
+Traceback (most recent call last):
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 128, in exec_func_with_error_handling
+    result = func()
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 669, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 2916, in <module>
+    main()
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 719, in main
+    show_step3_default_dreamplace()
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 1698, in show_step3_default_dreamplace
+    restore_original_pl(st.session_state.selected_benchmark)
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 177, in restore_original_pl
+    shutil.copy2(backup_file, pl_file)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/shutil.py", line 445, in copy2
+    copystat(src, dst, follow_symlinks=follow_symlinks)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/shutil.py", line 384, in copystat
+    lookup("utime")(dst, ns=(st.st_atime_ns, st.st_mtime_ns),
+PermissionError: [Errno 1] Operation not permitted
+2025-12-25 20:37:57.610 Uncaught app execution
+Traceback (most recent call last):
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 128, in exec_func_with_error_handling
+    result = func()
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 669, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 2916, in <module>
+    main()
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 719, in main
+    show_step3_default_dreamplace()
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 1698, in show_step3_default_dreamplace
+    restore_original_pl(st.session_state.selected_benchmark)
+  File "/home/ubuntu/vnet/Optimize-Rouitng-and-Placing-on-VLSI/Thesis/src/dreamplace_gui.py", line 177, in restore_original_pl
+    shutil.copy2(backup_file, pl_file)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/shutil.py", line 445, in copy2
+    copystat(src, dst, follow_symlinks=follow_symlinks)
+  File "/home/ubuntu/.conda/envs/env1/lib/python3.9/shutil.py", line 384, in copystat
+    lookup("utime")(dst, ns=(st.st_atime_ns, st.st_mtime_ns),
+PermissionError: [Errno 1] Operation not permitted

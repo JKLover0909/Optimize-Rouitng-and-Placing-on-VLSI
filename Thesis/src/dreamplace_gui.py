@@ -33,13 +33,12 @@ ADJUSTMENT_FACTOR = 50
 SAFE_GUARD_FACTOR = 90
 ROUTING_MODE = 3  # 6 layers (matching adaptec1.capo70.3d.35.50.90.gr format)
 
-# Fake runtime mapping for Default DREAMPlace workflow (in seconds)
-FAKE_RUNTIME_MAP = {
-    'adaptec1': 11.87,
-    'adaptec2': 14.61,
-    'adaptec3': 24.34,
-    'adaptec4': 25.13
-}
+# FAKE_RUNTIME_MAP = {
+#     'adaptec1': 11.87,
+#     'adaptec2': 14.61,
+#     'adaptec3': 24.34,
+#     'adaptec4': 25.13
+# }
 
 # NthuRoute parameters (fixed)
 NTHU_PARAMS = {
@@ -1675,7 +1674,7 @@ def show_step3_default_dreamplace():
     if st.session_state.dreamplace_completed:
         st.markdown('<div class="success-box">✅ DREAMPlace completed successfully!</div>', unsafe_allow_html=True)
         
-        # Show metrics box (HPWL + Fake Runtime) before visualization
+        
         show_default_metrics_box(st.session_state.selected_benchmark)
         
         # Show results
@@ -1866,38 +1865,52 @@ def show_step4_ranking_dreamplace():
 
 
 def show_default_metrics_box(benchmark):
-    """Display metrics box for Default workflow with fake runtime"""
+    """Display metrics box for Default workflow with real runtime"""
     st.markdown("---")
     st.subheader("📊 Placement Metrics")
     
-    # Parse log to get real HPWL
+    # Parse log to get real metrics
     log_path = f"{RESULTS_DIR}/{benchmark}/placement.log"
-    final_hpwl = None
+    metrics = None
     
     if os.path.exists(log_path):
         metrics = parse_dreamplace_log(log_path)
-        if metrics and metrics.get('final_hpwl'):
-            final_hpwl = metrics['final_hpwl']
-    
-    # Get fake runtime from mapping
-    fake_runtime = FAKE_RUNTIME_MAP.get(benchmark, 0.0)
     
     # Display metrics in columns
-    col1, col2 = st.columns(2)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        if final_hpwl:
-            hpwl_m = final_hpwl / 1e6
+        if metrics and metrics.get('final_hpwl'):
+            hpwl_m = metrics['final_hpwl'] / 1e6
             st.metric("Final HPWL", f"{hpwl_m:.2f}M")
         else:
-            st.warning(f"⚠️ HPWL not available. Log file: `{log_path}`")
-            if not os.path.exists(log_path):
-                st.info("💡 Run placement in `dreamplace_dev` container to generate results.")
-            else:
-                st.info("💡 Log file exists but HPWL could not be parsed. Check log format.")
+            st.metric("Final HPWL", "N/A")
     
     with col2:
-        st.metric("Runtime", f"{fake_runtime:.2f}s")
+        if metrics and metrics.get('final_overflow') is not None:
+            st.metric("Final Overflow", f"{metrics['final_overflow']:.2f}%")
+        else:
+            st.metric("Final Overflow", "N/A")
+    
+    with col3:
+        if metrics and metrics.get('total_runtime'):
+            st.metric("Runtime", f"{metrics['total_runtime']:.2f}s")
+        else:
+            st.metric("Runtime", "N/A")
+    
+    with col4:
+        if metrics and metrics.get('total_iterations'):
+            st.metric("Iterations", f"{metrics['total_iterations']}")
+        else:
+            st.metric("Iterations", "N/A")
+    
+    # Show warning if log file not found or not parsed
+    if not os.path.exists(log_path):
+        st.warning(f"⚠️ Log file not found: `{log_path}`")
+        st.info("💡 Run DREAMPlace to generate results.")
+    elif not metrics:
+        st.warning(f"⚠️ Could not parse log file: `{log_path}`")
+        st.info("💡 Check log format or run DREAMPlace again.")
     
     st.markdown("---")
 
